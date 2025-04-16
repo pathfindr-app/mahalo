@@ -1,0 +1,63 @@
+.admin-dashboard {
+  padding: 2rem 0;
+}
+
+/* Modal Styling */
+.MuiModal-root .MuiBox-root {
+  background-color: #fff;
+}
+
+/* Scrollbar Styling */
+.MuiModal-root .MuiBox-root::-webkit-scrollbar {
+  width: 8px;
+}
+
+.MuiModal-root .MuiBox-root::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.MuiModal-root .MuiBox-root::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.MuiModal-root .MuiBox-root::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Tab Panel Styling */
+.MuiTabs-root {
+  margin-bottom: 2rem;
+}
+
+.MuiTab-root {
+  text-transform: none;
+  font-weight: 500;
+}
+
+/* Paper Container Styling */
+.MuiPaper-root {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 8px !important;
+}
+
+/* Grid Container Spacing */
+.MuiGrid-container {
+  margin-top: 0 !important;
+}
+
+/* Typography Styling */
+.MuiTypography-h6 {
+  font-weight: 600 !important;
+  color: #2c3e50;
+}
+
+/* Modal Close Button */
+.MuiIconButton-root {
+  color: #64748b !important;
+}
+
+.MuiIconButton-root:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+} 

@@ -1,0 +1,9 @@
+.app {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.main-content {
+  padding-top: 80px; /* Height of header + some spacing */
+  min-height: calc(100vh - 80px);
+} 

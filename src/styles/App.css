@@ -1,0 +1,75 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Map Styles */
+.map-container {
+  width: 100%;
+  height: calc(100vh - var(--header-height) - var(--footer-height));
+  position: relative;
+}
+
+/* For full-screen maps */
+.map-container--fullscreen {
+  height: 100vh;
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal--open {
+  transform: translateY(0);
+}
+
+.modal__header {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal__content {
+  padding: 16px;
+}
+
+.modal__footer {
+  padding: 16px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* For tablets and above, modal appears from the side */
+@media (min-width: 768px) {
+  .modal {
+    width: 400px;
+    height: 100vh;
+    max-height: 100vh;
+    right: 0;
+    left: auto;
+    bottom: auto;
+    top: 0;
+    border-radius: 0;
+    transform: translateX(100%);
+  }
+  
+  .modal--open {
+    transform: translateX(0);
+  }
+} 

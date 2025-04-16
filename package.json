@@ -1,0 +1,51 @@
+{
+  "name": "mahalo",
+  "version": "1.0.0",
+  "description": "Maui interactive map application for vendors, POIs, and events",
+  "main": "index.js",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "keywords": [
+    "maui",
+    "map",
+    "tourism",
+    "react",
+    "mapbox",
+    "leaflet"
+  ],
+  "author": "",
+  "license": "ISC",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.11",
+    "@mui/material": "^5.15.11",
+    "emoji-picker-react": "^4.12.2",
+    "firebase": "^10.8.0",
+    "leaflet": "^1.9.4",
+    "localforage": "^1.10.0",
+    "mapbox-gl": "^3.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.22.1",
+    "react-scripts": "^5.0.1",
+    "react-select": "^5.8.0"
+  }
+}
