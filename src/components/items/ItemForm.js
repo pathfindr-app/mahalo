@@ -24,6 +24,14 @@ import {
   Grid,
   Select as MuiSelect
 } from '@mui/material';
+import ImageUploader from '../common/ImageUploader.js';
+
+// Rich text editor imports
+import { EditorState, ContentState, convertToRaw } from 'draft-js';
+import { Editor } from 'react-draft-wysiwyg';
+import draftToHtml from 'draftjs-to-html';
+import htmlToDraft from 'html-to-draftjs';
+import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
 
 // Form steps based on CURRENT_TICKET.md
 const FORM_STEPS = {
@@ -89,6 +97,9 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [submitError, setSubmitError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const latestCoordsRef = useRef({ lat: null, lng: null }); // Ref for latest coords
+
+  // Add state for rich text editor
+  const [editorState, setEditorState] = useState(EditorState.createEmpty());
 
   useEffect(() => {
     // Reset general state fields first
@@ -204,6 +215,10 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
             setFormData(stateData); // Set the correctly structured state
             // Update ref with initial valid coords if available
             latestCoordsRef.current = { lat: initialLat, lng: initialLng };
+
+            // Set editor state from detailed description HTML
+            const detailedHtml = itemData.description?.detailed || '';
+            setEditorState(convertHtmlToEditorState(detailedHtml));
           } else {
              console.error('Item not found for ID:', itemId);
             setFetchError('Item not found.');
@@ -403,6 +418,108 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     }
   };
 
+  // Function to handle editor state changes
+  const handleEditorStateChange = (newEditorState) => {
+    setEditorState(newEditorState);
+    
+    // Update formData with HTML content
+    const htmlContent = draftToHtml(convertToRaw(newEditorState.getCurrentContent()));
+    setFormData(prev => ({
+      ...prev,
+      description: {
+        ...prev.description,
+        detailed: htmlContent
+      }
+    }));
+  };
+
+  // Function to convert HTML to editor state
+  const convertHtmlToEditorState = (html) => {
+    if (!html || html === '') {
+      return EditorState.createEmpty();
+    }
+    
+    try {
+      const contentBlock = htmlToDraft(html);
+      if (contentBlock) {
+        const contentState = ContentState.createFromBlockArray(contentBlock.contentBlocks);
+        return EditorState.createWithContent(contentState);
+      }
+    } catch (error) {
+      console.error('Error converting HTML to editor state:', error);
+    }
+    
+    return EditorState.createEmpty();
+  };
+
+  // Handle header image upload
+  const handleHeaderImageUpload = (imageUrl, imagePath) => {
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        headerImage: {
+          url: imageUrl,
+          alt: formData.name || 'Header image',
+          path: imagePath
+        }
+      }
+    }));
+  };
+
+  // Handle header image deletion
+  const handleHeaderImageDelete = () => {
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        headerImage: {
+          url: '',
+          alt: '',
+          path: ''
+        }
+      }
+    }));
+  };
+
+  // Handle gallery images upload
+  const handleGalleryImagesUpload = (newImages) => {
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        gallery: [...prevData.presentation.gallery, ...newImages]
+      }
+    }));
+  };
+
+  // Handle gallery image deletion
+  const handleGalleryImageDelete = (index) => {
+    setFormData(prevData => {
+      const updatedGallery = [...prevData.presentation.gallery];
+      updatedGallery.splice(index, 1);
+      
+      return {
+        ...prevData,
+        presentation: {
+          ...prevData.presentation,
+          gallery: updatedGallery
+        }
+      };
+    });
+  };
+
+  // Handle gallery image reordering
+  const handleGalleryReorder = (newOrderedGallery) => {
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        gallery: newOrderedGallery
+      }
+    }));
+  };
+
   if (loading && isEditing && !fetchError) {
     return <div className="loading-indicator">Loading item data...</div>;
   }
@@ -495,6 +612,27 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                     placeholder="Detailed description (Markdown supported?)"
                     rows={5}
                 />
+            </div>
+
+            {/* Rich Text Editor for Detailed Description */}
+            <div className="form-group">
+              <label htmlFor="detailed-description">Detailed Description <span className="helper-text">(rich text format)</span></label>
+              <div className="rich-text-editor-container">
+                <Editor
+                  editorState={editorState}
+                  wrapperClassName="rich-text-editor-wrapper"
+                  editorClassName="rich-text-editor"
+                  onEditorStateChange={handleEditorStateChange}
+                  toolbar={{
+                    options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'history', 'embedded', 'emoji', 'image'],
+                    inline: { inDropdown: false },
+                    list: { inDropdown: true },
+                    textAlign: { inDropdown: true },
+                    link: { inDropdown: true },
+                    history: { inDropdown: false },
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -592,7 +730,74 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                 name="presentation.container.backgroundColor"
                 value={formData.presentation?.container?.backgroundColor || '#ffffff'}
                 onChange={handleChange}
+                className="color-input"
               />
+            </div>
+
+            <div className="form-group slider-group">
+              <label htmlFor="presentation.container.opacity">
+                Background Opacity: {formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}%
+              </label>
+              <input
+                type="range"
+                id="presentation.container.opacity"
+                name="presentation.container.opacity"
+                min="0"
+                max="100"
+                step="1"
+                value={formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}
+                onChange={handleChange}
+                className="slider-input"
+              />
+            </div>
+
+            <div className="form-group slider-group">
+              <label htmlFor="presentation.container.blur">
+                Background Blur: {formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}px
+              </label>
+              <input
+                type="range"
+                id="presentation.container.blur"
+                name="presentation.container.blur"
+                min="0"
+                max="20" // Max blur as per spec
+                step="1"
+                value={formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}
+                onChange={handleChange}
+                className="slider-input"
+              />
+            </div>
+
+            {/* Header Image Upload */}
+            <div className="form-group">
+              <ImageUploader
+                title="Header Image"
+                imageUrl={formData.presentation?.headerImage?.url || ''}
+                storagePath={itemId ? `items/${itemId}/header` : 'items/temp/header'}
+                onImageUploaded={handleHeaderImageUpload}
+                onImageDeleted={handleHeaderImageDelete}
+                buttonLabel="Upload Header Image"
+              />
+            </div>
+
+            {/* Gallery Images Upload */}
+            <div className="form-group">
+              <ImageUploader
+                title="Gallery Images"
+                allowMultiple={true}
+                images={formData.presentation?.gallery || []}
+                storagePath={itemId ? `items/${itemId}/gallery` : 'items/temp/gallery'}
+                onImageUploaded={handleGalleryImagesUpload}
+                onImageDeleted={handleGalleryImageDelete}
+                buttonLabel="Add Gallery Images"
+              />
+              
+              {/* Display order hint */}
+              {formData.presentation?.gallery?.length > 1 && (
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                  Drag images to reorder the gallery. First image will be displayed as primary.
+                </Typography>
+              )}
             </div>
           </div>
         </div>

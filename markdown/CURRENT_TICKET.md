@@ -148,22 +148,22 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 
 ### Phase 1: Basic Form & Listing Setup
 1. [X] Create form container component *(ItemManagementPage.js/ItemForm.js)*
-2. [ ] Implement basic Item Listing view (table or cards) to display existing items
-3. [ ] Add search/filter functionality to the Item List view
-4. [ ] Implement navigation from Item List to Item Form (for creating new items)
-5. [ ] Implement selection of an item from the list to load its data for editing
+2. [X] Implement basic Item Listing view (table or cards) to display existing items *(Created ItemList.js)*
+3. [X] Add search/filter functionality to the Item List view
+4. [X] Implement navigation from Item List to Item Form (for creating new items) *(Connected via AdminDashboard)*
+5. [X] Implement selection of an item from the list to load its data for editing *(Connected via AdminDashboard and ItemForm)*
 6. [X] Improve GPS input (Map picker with coordinate display/manual entry)
 7. [X] Replace emoji picker with text input placeholder
 8. [X] Set up basic Firebase connection *(Successfully tested basic Item creation)*
 
 ### Phase 2: Editing & Enhanced Form Features
-1. [ ] Implement 'Edit Item' mode in the ItemForm, pre-populating with selected item's data
-2. [ ] Implement Firebase `updateItem` function call on form submission in edit mode
-3. [ ] Add rich text editor for detailed description
-4. [ ] Create image upload system with Firebase Storage (for header/gallery)
+1. [X] Implement 'Edit Item' mode in the ItemForm, pre-populating with selected item's data *(Verified)*
+2. [X] Implement Firebase `updateItem` function call on form submission in edit mode *(Verified)*
+3. [X] Add rich text editor for detailed description
+4. [X] Create image upload system with Firebase Storage (for header/gallery)
 5. [ ] Implement gallery order management
 6. [ ] Add parking information section
-7. [ ] Create presentation style controls
+7. [X] Create presentation style controls *(Added opacity/blur sliders)*
 8. [X] Implement selection system for expanded tags (UI may need update, e.g., searchable dropdown)
 
 ### Phase 3: Deal Management
@@ -231,12 +231,16 @@ service cloud.firestore {
 ## Next Steps
 
 1. [X] Set up development environment with Firebase *(Configuration confirmed and documented)*
-2. [ ] Create basic Item Listing component
-3. [ ] Implement Firebase `queryItems` function for the listing view
-4. [ ] Implement navigation and data loading for editing items
-5. [ ] Begin Phase 2 implementation (Edit mode in form)
-6. [ ] Implement Firebase Storage for images
-7. [ ] Set up Cloud Functions project
+2. [X] Create basic Item Listing component *(Done)*
+3. [X] Implement Firebase `queryItems` function for the listing view *(Enhanced with filtering and sorting)*
+4. [X] Implement navigation and data loading for editing items *(Done)*
+5. [X] Begin Phase 2 implementation (Edit mode in form) *(Verified)*
+6. [X] Add search/filter functionality to the Item List view *(Implemented with client and server-side filtering)*
+7. [X] Add rich text editor for detailed description *(Implemented with Draft.js and react-draft-wysiwyg)*
+8. [X] Implement Firebase Storage for images *(Created storageService.js and ImageUploader component)*
+9. [ ] Implement gallery order management
+10. [ ] Add parking information section
+11. [ ] Set up Cloud Functions project
 
 ## Data Persistence Testing Plan (Manual)
 

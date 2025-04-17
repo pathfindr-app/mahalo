@@ -7,7 +7,15 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
-  where, // Add other query constraints as needed (orderBy, limit, etc.)
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  endAt,
+  startAt,
+  arrayContains,
+  or,
+  and,
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase.js'; // ADDED .js extension
@@ -61,27 +69,94 @@ export const getItem = async (id) => {
 };
 
 /**
- * Retrieves item documents from Firestore, optionally applying filters.
- * @param {object} [filters] - Optional filters (e.g., { type: 'vendor' }).
+ * Retrieves item documents from Firestore, applying various filters and sorting.
+ * @param {object} [options] - Query options
+ * @param {string} [options.type] - Filter by item type (e.g., 'vendor', 'poi')
+ * @param {string} [options.nameStartsWith] - Filter items where name starts with provided string
+ * @param {string} [options.nameContains] - Filter items where name contains provided string (less efficient, client-side filtering)
+ * @param {string[]} [options.tags] - Filter items that have at least one of these tags
+ * @param {boolean} [options.activeOnly] - Filter only active items if true
+ * @param {string} [options.sortBy] - Field to sort by (name, type, createdAt, lastUpdated)
+ * @param {boolean} [options.sortDesc] - Sort in descending order if true
+ * @param {number} [options.limitTo] - Limit number of results
+ * @param {object} [options.startAfterDoc] - Document to start after (for pagination)
  * @returns {Promise<object[]>} An array of item objects.
  */
-export const queryItems = async (filters = {}) => {
+export const queryItems = async (options = {}) => {
   try {
-    // Basic query, can be expanded with filters
-    let q = query(itemsCollectionRef); 
-
-    // Example filter (can add more complex logic based on 'filters' object)
-    if (filters.type) {
-      q = query(itemsCollectionRef, where('type', '==', filters.type));
+    let queryConstraints = [];
+    
+    // Type filter
+    if (options.type) {
+      queryConstraints.push(where('type', '==', options.type));
     }
-    // Add other filters like name search, tag search, etc. here
-
+    
+    // Tags filter (array-contains-any for OR condition on tags)
+    if (options.tags && options.tags.length > 0) {
+      // Firebase has a limit of 10 values in an array-contains-any query
+      if (options.tags.length <= 10) {
+        queryConstraints.push(where('tags', 'array-contains-any', options.tags));
+      } else {
+        console.warn('Too many tags for Firestore query. Limiting to first 10.');
+        queryConstraints.push(where('tags', 'array-contains-any', options.tags.slice(0, 10)));
+      }
+    }
+    
+    // Active items only
+    if (options.activeOnly) {
+      queryConstraints.push(where('status.isActive', '==', true));
+    }
+    
+    // Name starts with filter (uses indexing efficiently)
+    if (options.nameStartsWith) {
+      const searchText = options.nameStartsWith.toLowerCase();
+      queryConstraints.push(where('name', '>=', searchText));
+      queryConstraints.push(where('name', '<=', searchText + '\uf8ff'));
+    }
+    
+    // Sort options
+    if (options.sortBy) {
+      const sortDirection = options.sortDesc ? 'desc' : 'asc';
+      const sortPath = options.sortBy.includes('.') 
+        ? options.sortBy // For paths like 'status.lastUpdated'
+        : options.sortBy; // For direct fields like 'name'
+      
+      queryConstraints.push(orderBy(sortPath, sortDirection));
+    } else {
+      // Default sort by name
+      queryConstraints.push(orderBy('name', 'asc'));
+    }
+    
+    // Limit results
+    if (options.limitTo && typeof options.limitTo === 'number') {
+      queryConstraints.push(limit(options.limitTo));
+    }
+    
+    // Pagination
+    if (options.startAfterDoc) {
+      queryConstraints.push(startAfter(options.startAfterDoc));
+    }
+    
+    // Execute query
+    const q = query(itemsCollectionRef, ...queryConstraints);
     const querySnapshot = await getDocs(q);
+    
     const items = [];
     querySnapshot.forEach((doc) => {
       // Combine doc id with data
-      items.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      items.push({ id: doc.id, ...data });
     });
+    
+    // Handle name contains filter (has to be done client-side)
+    if (options.nameContains && typeof options.nameContains === 'string') {
+      const searchText = options.nameContains.toLowerCase();
+      return items.filter(item => 
+        item.name.toLowerCase().includes(searchText) || 
+        (item.description?.brief || '').toLowerCase().includes(searchText)
+      );
+    }
+    
     return items;
   } catch (e) {
     console.error('Error querying documents: ', e);
