@@ -22,9 +22,14 @@ import {
   FormControlLabel,
   Checkbox,
   Grid,
-  Select as MuiSelect
+  Select as MuiSelect,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import ImageUploader from '../common/ImageUploader.js';
+import DraggableGallery from '../common/DraggableGallery.js';
 
 // Rich text editor imports
 import { EditorState, ContentState, convertToRaw } from 'draft-js';
@@ -50,7 +55,7 @@ const tagOptions = ALL_TAGS.map(tag => ({
 
 function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [formData, setFormData] = useState({
-    type: '',
+    type: 'poi',
     icon: '',
     name: '',
     description: {
@@ -101,11 +106,15 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   // Add state for rich text editor
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
 
+  // Preview dialog state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
   useEffect(() => {
     // Reset general state fields first
     setFormData(prevData => ({
       ...prevData, // Keep potentially existing structure
-      type: '',
+      type: 'poi',
       icon: '',
       name: '',
       description: { brief: '', detailed: '', bestTime: '', weatherNotes: '' },
@@ -294,6 +303,27 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         coordinates: { 
           lat: isNaN(parsedLat) ? '' : parsedLat,
           lng: isNaN(parsedLng) ? '' : parsedLng 
+        }
+      }
+    }));
+  };
+
+  // Handle parking location coordinates change
+  const handleParkingLocationChange = (lat, lng) => {
+    const parsedLat = typeof lat === 'number' ? lat : parseFloat(lat);
+    const parsedLng = typeof lng === 'number' ? lng : parseFloat(lng);
+
+    // Update state for display/controlled component
+    setFormData(prevData => ({
+      ...prevData,
+      location: {
+        ...prevData.location,
+        parking: {
+          ...prevData.location.parking,
+          coordinates: { 
+            lat: isNaN(parsedLat) ? '' : parsedLat,
+            lng: isNaN(parsedLng) ? '' : parsedLng 
+          }
         }
       }
     }));
@@ -520,6 +550,17 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     }));
   };
 
+  // Handle preview image
+  const handlePreviewImage = (imageUrl) => {
+    setPreviewImage(imageUrl);
+    setPreviewOpen(true);
+  };
+
+  // Close preview dialog
+  const closePreview = () => {
+    setPreviewOpen(false);
+  };
+
   if (loading && isEditing && !fetchError) {
     return <div className="loading-indicator">Loading item data...</div>;
   }
@@ -690,6 +731,20 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                     placeholder="e.g., Free, $5/hour"
                   />
                 </div>
+                
+                {/* Add MapPicker for parking coordinates */}
+                <div className="form-group">
+                  <label>
+                    Parking Location Coordinates 
+                    <span className="helper-text">(where visitors should park)</span>
+                  </label>
+                  <MapPicker 
+                    initialLat={parseFloat(formData.location?.parking?.coordinates?.lat) || undefined}
+                    initialLng={parseFloat(formData.location?.parking?.coordinates?.lng) || undefined}
+                    onLocationSelect={handleParkingLocationChange}
+                    label="Parking Location"
+                  />
+                </div>
               </>
             )}
           </div>
@@ -792,16 +847,34 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                 buttonLabel="Add Gallery Images"
               />
               
-              {/* Display order hint */}
+              {/* Gallery order management */}
               {formData.presentation?.gallery?.length > 1 && (
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                  Drag images to reorder the gallery. First image will be displayed as primary.
-                </Typography>
+                <DraggableGallery
+                  images={formData.presentation.gallery}
+                  onReorder={handleGalleryReorder}
+                  onDelete={handleGalleryImageDelete}
+                  onPreview={handlePreviewImage}
+                />
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={previewOpen} onClose={closePreview} maxWidth="md">
+        <DialogTitle>Image Preview</DialogTitle>
+        <DialogContent>
+          {previewImage && (
+            <img src={previewImage} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh' }} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closePreview} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <div className="form-actions">
         {submitError && (

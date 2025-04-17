@@ -161,8 +161,8 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 2. [X] Implement Firebase `updateItem` function call on form submission in edit mode *(Verified)*
 3. [X] Add rich text editor for detailed description
 4. [X] Create image upload system with Firebase Storage (for header/gallery)
-5. [ ] Implement gallery order management
-6. [ ] Add parking information section
+5. [X] Implement gallery order management
+6. [X] Add parking information section
 7. [X] Create presentation style controls *(Added opacity/blur sliders)*
 8. [X] Implement selection system for expanded tags (UI may need update, e.g., searchable dropdown)
 
@@ -238,8 +238,8 @@ service cloud.firestore {
 6. [X] Add search/filter functionality to the Item List view *(Implemented with client and server-side filtering)*
 7. [X] Add rich text editor for detailed description *(Implemented with Draft.js and react-draft-wysiwyg)*
 8. [X] Implement Firebase Storage for images *(Created storageService.js and ImageUploader component)*
-9. [ ] Implement gallery order management
-10. [ ] Add parking information section
+9. [X] Implement gallery order management *(Added DraggableGallery component with drag and drop functionality using @dnd-kit)*
+10. [X] Add parking information section *(Enhanced the existing Location & Parking form section with coordinate picker for parking locations)*
 11. [ ] Set up Cloud Functions project
 
 ## Data Persistence Testing Plan (Manual)
