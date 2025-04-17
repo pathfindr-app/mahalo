@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getItem, createItem, updateItem } from '../../services/firestoreService.js';
@@ -43,10 +43,6 @@ const tagOptions = ALL_TAGS.map(tag => ({
 function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     type: '',
-    coordinates: {
-      lat: '',
-      lng: ''
-    },
     icon: '',
     name: '',
     description: {
@@ -56,6 +52,10 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       weatherNotes: ''
     },
     location: {
+      coordinates: {
+        lat: '',
+        lng: ''
+      },
       parking: {
         availability: 'none',
         description: '',
@@ -88,54 +88,36 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [fetchError, setFetchError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const latestCoordsRef = useRef({ lat: null, lng: null }); // Ref for latest coords
 
   useEffect(() => {
-    setFormData({
+    // Reset general state fields first
+    setFormData(prevData => ({
+      ...prevData, // Keep potentially existing structure
       type: '',
-      coordinates: {
-        lat: '',
-        lng: ''
-      },
       icon: '',
       name: '',
-      description: {
-        brief: '',
-        detailed: '',
-        bestTime: '',
-        weatherNotes: ''
+      description: { brief: '', detailed: '', bestTime: '', weatherNotes: '' },
+      location: { 
+          ...prevData.location, // Keep parking, etc.
+          coordinates: { lat: '', lng: '' } // Reset only coords state
       },
-      location: {
-        parking: {
-          availability: 'none',
-          description: '',
-          coordinates: {
-            lat: '',
-            lng: ''
-          },
-          cost: ''
-        }
-      },
-      presentation: {
-        container: {
-          opacity: 100,
-          blur: 0,
-          backgroundColor: '#ffffff'
-        },
-        headerImage: null,
-        gallery: []
+      presentation: { 
+          ...prevData.presentation, // Keep container, etc.
+          headerImage: null, 
+          gallery: [] 
       },
       tags: [],
       deals: [],
-      status: {
-        isActive: true,
-        createdAt: null,
-        updatedAt: null
-      }
-    });
+      status: { isActive: true, createdAt: null, updatedAt: null }
+    }));
     setValidationErrors({});
     setFetchError(null);
     setSubmitError(null);
     setLoading(false);
+    
+    // Explicitly reset ref only when creating new or itemId changes
+    latestCoordsRef.current = { lat: null, lng: null }; 
 
     if (itemId) {
       console.log(`Editing item with ID: ${itemId}`);
@@ -202,9 +184,16 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
             };
             
              // Ensure coordinates are suitable for form state (number or empty string)
+            let initialLat = null, initialLng = null;
             if (stateData.location.coordinates) {
-                stateData.location.coordinates.lat = stateData.location.coordinates.lat ? parseFloat(stateData.location.coordinates.lat) : '';
-                stateData.location.coordinates.lng = stateData.location.coordinates.lng ? parseFloat(stateData.location.coordinates.lng) : '';
+                const parsedLat = stateData.location.coordinates.lat ? parseFloat(stateData.location.coordinates.lat) : NaN;
+                const parsedLng = stateData.location.coordinates.lng ? parseFloat(stateData.location.coordinates.lng) : NaN;
+                stateData.location.coordinates.lat = !isNaN(parsedLat) ? parsedLat : '';
+                stateData.location.coordinates.lng = !isNaN(parsedLng) ? parsedLng : '';
+                if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                   initialLat = parsedLat;
+                   initialLng = parsedLng;
+                }
             }
              if (stateData.location.parking?.coordinates) {
                  stateData.location.parking.coordinates.lat = stateData.location.parking.coordinates.lat ? parseFloat(stateData.location.parking.coordinates.lat) : null;
@@ -213,6 +202,8 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
 
             console.log("State data prepared for form:", stateData);
             setFormData(stateData); // Set the correctly structured state
+            // Update ref with initial valid coords if available
+            latestCoordsRef.current = { lat: initialLat, lng: initialLng };
           } else {
              console.error('Item not found for ID:', itemId);
             setFetchError('Item not found.');
@@ -224,7 +215,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         })
         .finally(() => setLoading(false));
     } else {
-      console.log("Creating new item");
+      console.log("Creating new item - ref reset in useEffect");
       setIsEditing(false);
     }
   }, [itemId]);
@@ -268,32 +259,88 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     }));
   }, []);
 
-  const handleLocationChange = useCallback((coords) => {
-    console.log("MapPicker coords:", coords);
-    const lat = typeof coords.lat === 'number' ? coords.lat : parseFloat(coords.lat);
-    const lng = typeof coords.lng === 'number' ? coords.lng : parseFloat(coords.lng);
+  const handleLocationChange = (lat, lng) => {
+    console.log("MapPicker coords:", { lat, lng });
+    const parsedLat = typeof lat === 'number' ? lat : parseFloat(lat);
+    const parsedLng = typeof lng === 'number' ? lng : parseFloat(lng);
 
+    // Update ref immediately
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      latestCoordsRef.current = { lat: parsedLat, lng: parsedLng };
+    } else {
+      latestCoordsRef.current = { lat: null, lng: null }; // Clear if invalid
+    }
+
+    // Update state for display/controlled component
     setFormData(prevData => ({
       ...prevData,
       location: {
         ...prevData.location,
         coordinates: { 
-          lat: isNaN(lat) ? '' : lat,
-          lng: isNaN(lng) ? '' : lng 
+          lat: isNaN(parsedLat) ? '' : parsedLat,
+          lng: isNaN(parsedLng) ? '' : parsedLng 
         }
       }
     }));
-  }, []);
+  };
 
   const validateForm = () => {
     const errors = {};
-    if (!formData.name) errors.name = 'Name is required';
-    if (!formData.type) errors.type = 'Type is required';
-    if (!formData.location?.coordinates?.lat || !formData.location?.coordinates?.lng) {
-       errors.coordinates = 'Valid Latitude and Longitude are required';
+    let isValid = true;
+    console.log("Validating form data:", formData); // Add log to see state at validation time
+    console.log("Latest coords ref:", latestCoordsRef.current); // Log ref as well
+
+    // Basic Info Validation
+    if (!formData.name.trim()) {
+      errors.name = 'Item Name is required.';
+      isValid = false;
     }
+    if (!formData.type) {
+      errors.type = 'Item Type is required.';
+      isValid = false;
+    }
+
+    // Location Validation
+    const stateLat = formData.location?.coordinates?.lat;
+    const stateLng = formData.location?.coordinates?.lng;
+    const refLat = latestCoordsRef.current?.lat;
+    const refLng = latestCoordsRef.current?.lng;
+
+    // Determine the most reliable latitude value for validation
+    let latToValidate = stateLat;
+    // Use ref value ONLY if state value is empty/null/undefined AND ref value is not null/undefined
+    if ((stateLat === '' || stateLat === null || stateLat === undefined) && (refLat !== null && refLat !== undefined)) {
+        console.log("Validation using refLat as stateLat is empty/invalid.");
+        latToValidate = refLat;
+    }
+
+    // Determine the most reliable longitude value for validation
+    let lngToValidate = stateLng;
+    // Use ref value ONLY if state value is empty/null/undefined AND ref value is not null/undefined
+    if ((stateLng === '' || stateLng === null || stateLng === undefined) && (refLng !== null && refLng !== undefined)) {
+        console.log("Validation using refLng as stateLng is empty/invalid.");
+        lngToValidate = refLng;
+    }
+
+    // Perform validation on the chosen values (could be from state or ref)
+    // Check if the value is empty OR if it's not parseable as a number
+    if (latToValidate === '' || latToValidate === null || latToValidate === undefined || isNaN(parseFloat(latToValidate))) {
+         console.log(`Latitude validation failed. Value: ${latToValidate}, Type: ${typeof latToValidate}`);
+         errors.locationCoordinates = 'Valid Latitude is required.';
+         isValid = false;
+    }
+    if (lngToValidate === '' || lngToValidate === null || lngToValidate === undefined || isNaN(parseFloat(lngToValidate))) {
+         console.log(`Longitude validation failed. Value: ${lngToValidate}, Type: ${typeof lngToValidate}`);
+         errors.locationCoordinates = errors.locationCoordinates ? 'Valid Latitude and Longitude are required.' : 'Valid Longitude is required.';
+         isValid = false;
+    }
+
+
+    // Add other validations as needed (e.g., parking details if required based on availability)
+
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    console.log("Validation result:", isValid, "Errors:", errors);
+    return isValid;
   };
 
   const handleSubmit = async (e) => {
@@ -460,10 +507,11 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
             <div className="form-group">
               <label>Location *</label>
               <MapPicker 
-                initialCoords={formData.location?.coordinates}
-                onLocationChange={handleLocationChange} 
+                initialLat={parseFloat(formData.location?.coordinates?.lat) || undefined}
+                initialLng={parseFloat(formData.location?.coordinates?.lng) || undefined}
+                onLocationSelect={handleLocationChange}
               />
-              {validationErrors.coordinates && <span className="error-message">{validationErrors.coordinates}</span>}
+              {validationErrors.locationCoordinates && <span className="error-message">{validationErrors.locationCoordinates}</span>}
             </div>
 
             <div className="form-group">

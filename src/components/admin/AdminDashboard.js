@@ -116,6 +116,7 @@ function AdminDashboard() {
         open={modalOpen}
         onClose={handleCloseModal}
         aria-labelledby="modal-title"
+        keepMounted
       >
         <Box sx={modalStyle}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

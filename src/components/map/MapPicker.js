@@ -27,12 +27,17 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
   const [displayLat, setDisplayLat] = useState('');
   const [displayLng, setDisplayLng] = useState('');
 
-  // Effect to update display coordinates when props change
+  // --- Refs for callbacks ---
+  const onLocationSelectRef = useRef(onLocationSelect);
+  const handleMarkerDragRef = useRef();
+  const updateLocationRef = useRef();
+
+  // Keep the onLocationSelect ref updated with the latest prop value
   useEffect(() => {
-    // Only update display if different from props to avoid loops if parent updates state based on onLocationSelect
-    if (initialLat !== displayLat) setDisplayLat(initialLat || '');
-    if (initialLng !== displayLng) setDisplayLng(initialLng || '');
-  }, [initialLat, initialLng]);
+    onLocationSelectRef.current = onLocationSelect;
+  }, [onLocationSelect]);
+
+  // --- Internal Callbacks ---
 
   // Memoized callback for marker drag end
   const handleMarkerDrag = useCallback(() => {
@@ -40,9 +45,17 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
       const { lng, lat } = marker.current.getLngLat();
       setDisplayLat(lat);
       setDisplayLng(lng);
-      onLocationSelect(lat, lng); // Notify parent
+      // Use ref to call the latest onLocationSelect function
+      if (onLocationSelectRef.current) {
+        onLocationSelectRef.current(lat, lng);
+      }
     }
-  }, [onLocationSelect]);
+  }, []); // No dependencies needed as it uses the ref
+
+  // Keep the handleMarkerDrag ref updated
+  useEffect(() => {
+    handleMarkerDragRef.current = handleMarkerDrag;
+  }, [handleMarkerDrag]);
 
   // Memoized callback to update location state, marker position, and notify parent
   const updateLocation = useCallback((lat, lng, shouldFlyTo = false) => {
@@ -56,7 +69,10 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
 
     setDisplayLat(lat);
     setDisplayLng(lng);
-    onLocationSelect(lat, lng); // Notify parent component
+    // Use ref to call the latest onLocationSelect function
+    if (onLocationSelectRef.current) {
+      onLocationSelectRef.current(lat, lng);
+    }
     setError(null); // Clear previous errors
 
     // Update map marker/view only if map is loaded
@@ -68,14 +84,44 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
         marker.current = new mapboxgl.Marker({ draggable: true, color: '#4CAF50' })
           .setLngLat([lng, lat])
           .addTo(map.current)
-          .on('dragend', handleMarkerDrag); // Attach drag handler
+          // Use stable wrapper for listener that calls the LATEST handler via ref
+          .on('dragend', () => {
+            if (handleMarkerDragRef.current) {
+              handleMarkerDragRef.current();
+            }
+          });
       }
       // Optionally fly to the new location
       if (shouldFlyTo) {
          map.current.flyTo({ center: [lng, lat], zoom: 15, essential: true });
       }
     }
-  }, [onLocationSelect, mapLoaded, handleMarkerDrag]);
+  // Dependencies only include things used directly inside, not refs or functions called via refs
+  }, [mapLoaded]); 
+
+  // Keep the updateLocation ref updated
+  useEffect(() => {
+    updateLocationRef.current = updateLocation;
+  }, [updateLocation]);
+
+  // --- Effects ---
+
+  // Effect to update display coordinates when props change
+  useEffect(() => {
+    // Only update display if different from props to avoid potential loops
+    const currentDisplayLat = parseFloat(displayLat);
+    const currentDisplayLng = parseFloat(displayLng);
+    if (initialLat !== undefined && (isNaN(currentDisplayLat) || Math.abs(currentDisplayLat - initialLat) > 1e-6)) {
+        setDisplayLat(initialLat);
+    }
+    if (initialLng !== undefined && (isNaN(currentDisplayLng) || Math.abs(currentDisplayLng - initialLng) > 1e-6)) {
+        setDisplayLng(initialLng);
+    }
+    // Set to empty string if prop is null/undefined
+    if (initialLat == null) setDisplayLat('');
+    if (initialLng == null) setDisplayLng('');
+
+  }, [initialLat, initialLng]); // Rerun only when initial props change
 
   // Effect for ONE-TIME map initialization on mount
   useEffect(() => {
@@ -85,7 +131,7 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: MAPBOX_STYLE,
-        center: [initialLng || -156.3, initialLat || 20.75], // Use initial props for first center
+        center: [initialLng ?? -156.3, initialLat ?? 20.75], // Use initial props or default
         zoom: 10,
         maxBounds: [
           [MAUI_BOUNDS.west, MAUI_BOUNDS.south],
@@ -99,15 +145,19 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
         // Add initial marker *after* map loads, if coords provided
+        // Use the ref to ensure the latest updateLocation logic is used
         if (initialLat !== undefined && initialLng !== undefined) {
-            updateLocation(initialLat, initialLng, false); // Use updateLocation to create marker
+            if (updateLocationRef.current) {
+              updateLocationRef.current(initialLat, initialLng, false);
+            }
         }
 
-        // Handle map clicks to place/move marker
+        // Use stable wrapper for listener that calls the LATEST handler via ref
         map.current.on('click', (e) => {
           const { lng, lat } = e.lngLat;
-          // No need to remove marker here, updateLocation handles create/move
-          updateLocation(lat, lng);
+          if (updateLocationRef.current) {
+            updateLocationRef.current(lat, lng);
+          }
         });
       });
 
@@ -127,30 +177,44 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
     return () => {
       console.log('Cleaning up map');
       if (marker.current) {
-         // No need to call off explicitly if the map is removed?
-         // marker.current.off('dragend', handleMarkerDrag); 
+         // Mapbox remove() should handle listener cleanup, but being explicit doesn't hurt
+         // marker.current.off('dragend'); 
          marker.current.remove();
+         marker.current = null;
       } 
       if (map.current) {
+        // map.current.off('click'); 
+        // map.current.off('load');
+        // map.current.off('error');
         map.current.remove();
         map.current = null; // Clear ref
       } 
-      // No need to setMapLoaded(false) here, component is unmounting
+      setMapLoaded(false); // Reset loaded state on unmount
     };
-  }, []); // <-- EMPTY dependency array ensures this runs only ONCE
+  // Dependencies: Include initial coords used for setup.
+  }, [initialLat, initialLng]); // Correctly run only on mount/unmount, using initial props
 
   // Effect to update marker/view when initialLat/initialLng props change *after* initial load
   useEffect(() => {
-    if (mapLoaded && initialLat !== undefined && initialLng !== undefined) {
-       // Check if props differ significantly from current state to avoid minor loops
-       const latDiff = Math.abs(displayLat - initialLat);
-       const lngDiff = Math.abs(displayLng - initialLng);
-       if (latDiff > 0.00001 || lngDiff > 0.00001) {
+    // Ensure map is loaded and props are valid numbers
+    if (mapLoaded && typeof initialLat === 'number' && typeof initialLng === 'number') {
+       const currentMarkerLngLat = marker.current?.getLngLat();
+       // Check if props differ significantly from current marker position
+       const latDiff = Math.abs(currentMarkerLngLat?.lat - initialLat);
+       const lngDiff = Math.abs(currentMarkerLngLat?.lng - initialLng);
+       // Update only if marker doesn't exist or position is different (with tolerance)
+       if (!marker.current || latDiff > 1e-6 || lngDiff > 1e-6) {
             console.log('Props changed, updating location from effect');
-            updateLocation(initialLat, initialLng, false); // Update marker without flying
+            // Use ref to ensure the latest updateLocation logic is used
+            if (updateLocationRef.current) {
+              updateLocationRef.current(initialLat, initialLng, false); // Update marker without flying
+            }
        }
     }
-  }, [initialLat, initialLng, mapLoaded, updateLocation, displayLat, displayLng]);
+  // Rerun when props or mapLoaded status change
+  }, [initialLat, initialLng, mapLoaded]); 
+
+  // --- Event Handlers ---
 
   const handleGeolocation = () => {
     setIsLocating(true);
@@ -174,10 +238,11 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
           return;
         }
 
-        // Update map and marker
+        // Use ref to ensure the latest updateLocation logic is used
         if (map.current && mapLoaded) {
-          // Let updateLocation handle marker creation/move and flying
-          updateLocation(latitude, longitude, true); 
+          if (updateLocationRef.current) {
+            updateLocationRef.current(latitude, longitude, true);
+          }
         }
         setIsLocating(false);
       },
@@ -199,8 +264,11 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
     setDisplayLat(val); // Update display immediately for responsiveness
     const newLat = parseFloat(val);
     const currentLng = parseFloat(displayLng);
+    // Use ref to ensure the latest updateLocation logic is used
     if (!isNaN(newLat) && !isNaN(currentLng)) {
-       updateLocation(newLat, currentLng); // Use memoized version
+       if (updateLocationRef.current) {
+         updateLocationRef.current(newLat, currentLng);
+       }
     }
   };
 
@@ -209,11 +277,15 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
     setDisplayLng(val); // Update display immediately
     const newLng = parseFloat(val);
     const currentLat = parseFloat(displayLat);
+    // Use ref to ensure the latest updateLocation logic is used
      if (!isNaN(newLng) && !isNaN(currentLat)) {
-       updateLocation(currentLat, newLng); // Use memoized version
+       if (updateLocationRef.current) {
+         updateLocationRef.current(currentLat, newLng);
+       }
     }
   };
 
+  // --- Render --- 
   return (
     <div className="map-picker">
       <div ref={mapContainer} className="map-container" />
@@ -277,6 +349,13 @@ MapPicker.propTypes = {
   onLocationSelect: PropTypes.func.isRequired,
   initialLat: PropTypes.number,
   initialLng: PropTypes.number
+};
+
+// Add defaultProps to prevent undefined warning on initial render
+MapPicker.defaultProps = {
+  onLocationSelect: () => {},
+  initialLat: undefined,
+  initialLng: undefined
 };
 
 export default MapPicker; 
