@@ -102,6 +102,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [submitError, setSubmitError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const latestCoordsRef = useRef({ lat: null, lng: null }); // Ref for latest coords
+  const isMountedRef = useRef(true);
 
   // Add state for rich text editor
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
@@ -111,6 +112,9 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
+    // Set mounted flag to true when component mounts
+    isMountedRef.current = true;
+
     // Reset general state fields first
     setFormData(prevData => ({
       ...prevData, // Keep potentially existing structure
@@ -145,6 +149,8 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       setLoading(true);
       getItem(itemId)
         .then(itemData => {
+          if (!isMountedRef.current) return; // Check if component is still mounted
+
           if (itemData) {
             console.log("Fetched item data:", itemData);
             
@@ -220,28 +226,44 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                  stateData.location.parking.coordinates.lng = stateData.location.parking.coordinates.lng ? parseFloat(stateData.location.parking.coordinates.lng) : null;
              }
 
-            console.log("State data prepared for form:", stateData);
-            setFormData(stateData); // Set the correctly structured state
-            // Update ref with initial valid coords if available
-            latestCoordsRef.current = { lat: initialLat, lng: initialLng };
+            if (isMountedRef.current) {
+              console.log("State data prepared for form:", stateData);
+              setFormData(stateData); // Set the correctly structured state
+              // Update ref with initial valid coords if available
+              latestCoordsRef.current = { lat: initialLat, lng: initialLng };
 
-            // Set editor state from detailed description HTML
-            const detailedHtml = itemData.description?.detailed || '';
-            setEditorState(convertHtmlToEditorState(detailedHtml));
+              // Set editor state from detailed description HTML
+              const detailedHtml = itemData.description?.detailed || '';
+              setEditorState(convertHtmlToEditorState(detailedHtml));
+            }
           } else {
-             console.error('Item not found for ID:', itemId);
-            setFetchError('Item not found.');
+            if (isMountedRef.current) {
+              console.error('Item not found for ID:', itemId);
+              setFetchError('Item not found.');
+            }
           }
         })
         .catch(err => {
-          console.error("Error fetching item:", err);
-          setFetchError('Failed to load item data.');
+          if (isMountedRef.current) {
+            console.error("Error fetching item:", err);
+            setFetchError('Failed to load item data.');
+          }
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (isMountedRef.current) {
+            setLoading(false);
+          }
+        });
     } else {
       console.log("Creating new item - ref reset in useEffect");
       setIsEditing(false);
     }
+
+    // Cleanup function to set mounted flag to false when unmounting
+    return () => {
+      console.log("ItemForm component unmounting");
+      isMountedRef.current = false;
+    };
   }, [itemId]);
 
   const handleChange = useCallback((event) => {
@@ -395,6 +417,8 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       return;
     }
 
+    if (!isMountedRef.current) return; // Check mounted before proceeding
+    
     setLoading(true);
     setSubmitError(null);
     setValidationErrors({});
@@ -439,12 +463,18 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         console.log('Item created successfully with ID:', newId);
       }
        localStorage.removeItem('itemFormDraft');
-      onSubmissionSuccess();
+      if (isMountedRef.current && onSubmissionSuccess) {
+        onSubmissionSuccess();
+      }
     } catch (err) {
       console.error("Error submitting form:", err);
-      setSubmitError(err.message || 'Failed to save item.');
+      if (isMountedRef.current) {
+        setSubmitError(err.message || 'Failed to save item.');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

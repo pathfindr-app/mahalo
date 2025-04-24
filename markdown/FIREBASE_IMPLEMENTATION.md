@@ -61,10 +61,10 @@
   queryItems: (filters) => Promise<ItemData[]>,
   
   // Deal Operations
-  createDeal: (data) => Promise<DealId>,
-  updateDeal: (id, data) => Promise<void>,
-  deleteDeal: (id) => Promise<void>,
-  getDeal: (id) => Promise<DealData>,
+  addDeal: (data) => Promise<{success: boolean, id: string}>,
+  updateDeal: (id, data) => Promise<{success: boolean, id: string}>,
+  deleteDeal: (id) => Promise<{success: boolean}>,
+  getDeal: (id) => Promise<{success: boolean, data: DealData}>,
   queryDeals: (filters) => Promise<DealData[]>,
   
   // Batch Operations
@@ -83,11 +83,11 @@
    - [✓] Implement `updateItem`
    - [✓] Implement `deleteItem`
 2. Create base CRUD operations for Deals
-   - [✓] Implement `createDeal`
-   - [✓] Implement `getDeal`
-   - [✓] Implement `queryDeals` with filtering/sorting options
-   - [✓] Implement `updateDeal`
-   - [✓] Implement `deleteDeal`
+   - [✓] Implement `addDeal` *(Fixed to properly save to Deals collection)*
+   - [✓] Implement `getDeal` *(Updated to read from Deals collection)*
+   - [✓] Implement `queryDeals` with filtering/sorting options *(Verified working with Deals collection)*
+   - [✓] Implement `updateDeal` *(Fixed to use correct collection reference)*
+   - [✓] Implement `deleteDeal` *(Fixed to use correct collection reference)*
 3. Implement query builders with proper indexing *(Basic implementation for Items and Deals)*
 4. Add batch operation support
 5. Create real-time subscription methods

@@ -26,11 +26,25 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
   const [isLocating, setIsLocating] = useState(false);
   const [displayLat, setDisplayLat] = useState('');
   const [displayLng, setDisplayLng] = useState('');
+  
+  // Add an isMounted ref to track component mount state
+  const isMountedRef = useRef(true);
 
   // --- Refs for callbacks ---
   const onLocationSelectRef = useRef(onLocationSelect);
   const handleMarkerDragRef = useRef();
   const updateLocationRef = useRef();
+
+  // Set isMounted to false on unmount
+  useEffect(() => {
+    // Mark as mounted on component mount
+    isMountedRef.current = true;
+    
+    // Cleanup function to mark as unmounted
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Keep the onLocationSelect ref updated with the latest prop value
   useEffect(() => {
@@ -41,7 +55,7 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
 
   // Memoized callback for marker drag end
   const handleMarkerDrag = useCallback(() => {
-    if (marker.current) {
+    if (marker.current && isMountedRef.current) {
       const { lng, lat } = marker.current.getLngLat();
       setDisplayLat(lat);
       setDisplayLng(lng);
@@ -63,17 +77,21 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
     if (lat === undefined || lng === undefined || 
         lat < MAUI_BOUNDS.south || lat > MAUI_BOUNDS.north ||
         lng < MAUI_BOUNDS.west || lng > MAUI_BOUNDS.east) {
-      setError('Coordinates are outside of Maui bounds or invalid.');
+      if (isMountedRef.current) {
+        setError('Coordinates are outside of Maui bounds or invalid.');
+      }
       return; // Don't update if invalid
     }
 
-    setDisplayLat(lat);
-    setDisplayLng(lng);
-    // Use ref to call the latest onLocationSelect function
-    if (onLocationSelectRef.current) {
-      onLocationSelectRef.current(lat, lng);
+    if (isMountedRef.current) {
+      setDisplayLat(lat);
+      setDisplayLng(lng);
+      // Use ref to call the latest onLocationSelect function
+      if (onLocationSelectRef.current) {
+        onLocationSelectRef.current(lat, lng);
+      }
+      setError(null); // Clear previous errors
     }
-    setError(null); // Clear previous errors
 
     // Update map marker/view only if map is loaded
     if (map.current && mapLoaded) {
@@ -108,6 +126,8 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
 
   // Effect to update display coordinates when props change
   useEffect(() => {
+    if (!isMountedRef.current) return;
+
     // Only update display if different from props to avoid potential loops
     const currentDisplayLat = parseFloat(displayLat);
     const currentDisplayLng = parseFloat(displayLng);
@@ -121,7 +141,7 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
     if (initialLat == null) setDisplayLat('');
     if (initialLng == null) setDisplayLng('');
 
-  }, [initialLat, initialLng]); // Rerun only when initial props change
+  }, [initialLat, initialLng, displayLat, displayLng]); // Rerun only when initial props change
 
   // Effect for ONE-TIME map initialization on mount
   useEffect(() => {
@@ -140,8 +160,11 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
       });
 
       map.current.on('load', () => {
-        setMapLoaded(true);
-        console.log('Map loaded successfully');
+        if (isMountedRef.current) {
+          setMapLoaded(true);
+          console.log('Map loaded successfully');
+        }
+        
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
         // Add initial marker *after* map loads, if coords provided
@@ -163,19 +186,25 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
 
       map.current.on('error', (e) => {
         console.error('Map error:', e);
-        setError('Error loading map');
-        setMapLoaded(false); // Ensure loaded is false on error
+        if (isMountedRef.current) {
+          setError('Error loading map');
+          setMapLoaded(false); // Ensure loaded is false on error
+        }
       });
 
     } catch (err) {
       console.error('Error initializing map:', err);
-      setError('Error initializing map');
-      setMapLoaded(false);
+      if (isMountedRef.current) {
+        setError('Error initializing map');
+        setMapLoaded(false);
+      }
     }
 
     // Cleanup function: ONLY runs on component unmount
     return () => {
       console.log('Cleaning up map');
+      isMountedRef.current = false;
+      
       if (marker.current) {
          // Mapbox remove() should handle listener cleanup, but being explicit doesn't hurt
          // marker.current.off('dragend'); 
@@ -189,7 +218,9 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
         map.current.remove();
         map.current = null; // Clear ref
       } 
-      setMapLoaded(false); // Reset loaded state on unmount
+      if (isMountedRef.current) {
+        setMapLoaded(false); // Reset loaded state on unmount
+      }
     };
   // Dependencies: Include initial coords used for setup.
   }, [initialLat, initialLng]); // Correctly run only on mount/unmount, using initial props
@@ -217,24 +248,32 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
   // --- Event Handlers ---
 
   const handleGeolocation = () => {
+    if (!isMountedRef.current) return;
+    
     setIsLocating(true);
     setError(null);
 
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      setIsLocating(false);
+      if (isMountedRef.current) {
+        setError('Geolocation is not supported by your browser');
+        setIsLocating(false);
+      }
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (!isMountedRef.current) return;
+        
         const { latitude, longitude } = position.coords;
 
         // Check if location is within Maui bounds
         if (latitude < MAUI_BOUNDS.south || latitude > MAUI_BOUNDS.north ||
             longitude < MAUI_BOUNDS.west || longitude > MAUI_BOUNDS.east) {
-          setError('Your location is outside of Maui');
-          setIsLocating(false);
+          if (isMountedRef.current) {
+            setError('Your location is outside of Maui');
+            setIsLocating(false);
+          }
           return;
         }
 
@@ -244,22 +283,24 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
             updateLocationRef.current(latitude, longitude, true);
           }
         }
-        setIsLocating(false);
+        if (isMountedRef.current) {
+          setIsLocating(false);
+        }
       },
       (error) => {
-        setError(`Error getting location: ${error.message}`);
-        setIsLocating(false);
+        if (isMountedRef.current) {
+          setError(`Error getting location: ${error.message}`);
+          setIsLocating(false);
+        }
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: true }
     );
   };
 
   // Handle manual input changes
   const handleLatChange = (e) => {
+    if (!isMountedRef.current) return;
+    
     const val = e.target.value;
     setDisplayLat(val); // Update display immediately for responsiveness
     const newLat = parseFloat(val);
@@ -273,6 +314,8 @@ function MapPicker({ onLocationSelect, initialLat, initialLng }) {
   };
 
   const handleLngChange = (e) => {
+    if (!isMountedRef.current) return;
+    
     const val = e.target.value;
     setDisplayLng(val); // Update display immediately
     const newLng = parseFloat(val);

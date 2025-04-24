@@ -1,0 +1,80 @@
+.deal-form-container {
+  padding: 24px;
+}
+
+.editor-wrapper {
+  width: 100%;
+  min-height: 200px;
+  border-radius: 4px;
+}
+
+.editor-main {
+  min-height: 150px;
+  padding: 8px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* Make sure rich text editor handles overflows properly */
+.rdw-editor-toolbar {
+  margin-bottom: 8px;
+  border: none !important;
+}
+
+.rdw-option-wrapper {
+  border: 1px solid #e0e0e0;
+  margin-right: 4px;
+}
+
+.rdw-option-active {
+  background-color: #efefef;
+}
+
+/* Date picker adjustments */
+.MuiPickersPopper-root {
+  z-index: 1400 !important; /* Ensure date picker appears over other elements */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .deal-form-container {
+    padding: 16px;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}
+
+/* Date picker styling */
+.date-picker-wrapper {
+  width: 100%;
+}
+
+.date-picker {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.23);
+  border-radius: 4px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.date-picker:focus {
+  border-color: #1976d2;
+  outline: none;
+}
+
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker__input-container {
+  width: 100%;
+} 

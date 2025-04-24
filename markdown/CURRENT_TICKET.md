@@ -167,11 +167,11 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 8. [X] Implement selection system for expanded tags (UI may need update, e.g., searchable dropdown)
 
 ### Phase 3: Deal Management
-1. [ ] Create deal form component
-2. [ ] Set up deals collection in Firebase
-3. [ ] Implement deal validation logic
-4. [ ] Add deal analytics structure
-5. [ ] Create deal status tracking
+1. [X] Create deal form component
+2. [X] Set up deals collection in Firebase
+3. [X] Implement deal validation logic
+4. [X] Add deal analytics structure
+5. [X] Create deal status tracking
 
 ### Phase 4: Analytics & Cloud Functions
 1. [ ] Set up Cloud Functions for analytics
@@ -186,6 +186,7 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 3. [ ] Add preview mode for item display
 4. [X] Create success/error notifications *(Partially done for submission)*
 5. [X] Add loading states and animations *(Partially done for map, needs addition for item list/form)*
+6. [X] Fix React warnings about setState calls on unmounted components
 
 ## Firebase Security Rules
 
@@ -240,7 +241,39 @@ service cloud.firestore {
 8. [X] Implement Firebase Storage for images *(Created storageService.js and ImageUploader component)*
 9. [X] Implement gallery order management *(Added DraggableGallery component with drag and drop functionality using @dnd-kit)*
 10. [X] Add parking information section *(Enhanced the existing Location & Parking form section with coordinate picker for parking locations)*
-11. [ ] Set up Cloud Functions project
+11. [✓] Set up Cloud Functions project *(Created deal analytics, real-time updates, and background processing functions. Deployment pending Firebase Blaze plan upgrade. See markdown/CLOUD_FUNCTIONS_PROGRESS.md for details)*
+12. [X] Create deal form component *(Created DealForm.js with validation, vendor selection, date picking, and rich text editing features)*
+13. [X] Set up deals collection in Firebase *(Added deal-related functions to firestoreService.js)*
+14. [X] Implement deal validation logic *(Added validation in DealForm component for all required fields)*
+15. [X] Add deal analytics structure *(Created data structure in Firebase and supporting UI components)*
+16. [X] Create deal status tracking *(Implemented isActive field and status display in DealList)*
+17. [X] Fix React warnings about setState on unmounted components *(Added isMountedRef pattern to ItemForm and MapPicker components)*
+18. [X] Update Firestore service for deals *(Fixed naming inconsistency between `addDeal` and `createDeal` functions)*
+19. [X] Fix critical issue with deals not being saved *(Fixed collection references in firestoreService.js to use the Deals collection consistently instead of Items collection)*
+20. [ ] **Frontend Map Integration** *(New Phase)*
+    - [ ] Create map view component that displays items as markers
+    - [ ] Implement marker clustering for areas with many items
+    - [ ] Create modal component for displaying item details when marker is clicked
+    - [ ] Display item details in modal (description, images, location info)
+    - [ ] Show associated deals in modal for vendor type items
+    - [ ] Implement deal claiming functionality for users
+
+## Phase 6: Map Integration
+1. [ ] Create MapView component
+   - [ ] Display all items as markers
+   - [ ] Implement custom markers based on item type
+   - [ ] Add tooltip with basic info on hover
+2. [ ] Create ItemDetailModal component
+   - [ ] Display comprehensive item details from ItemForm data
+   - [ ] Show image gallery with carousel
+   - [ ] Implement responsive design for mobile/desktop
+3. [ ] Add DealSection to modal for vendor items
+   - [ ] List all active deals
+   - [ ] Show deal details on click/expand
+   - [ ] Implement claim button and tracking
+4. [ ] Create animations and transitions
+   - [ ] Smooth open/close animations for modal
+   - [ ] Loading states for data fetching
 
 ## Data Persistence Testing Plan (Manual)
 

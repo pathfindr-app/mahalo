@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/common/Header.js';
 import AdminDashboard from './components/admin/AdminDashboard.js';
 import Login from './components/auth/Login.js';
+import AdminCheck from './components/auth/AdminCheck.js';
+import HomePage from './pages/HomePage.js';
 import { useAuth } from './context/AuthContext.js';
 import './App.css';
 
@@ -36,13 +38,21 @@ function App() {
       <Header isAuthenticated={isAuthenticated} user={currentUser} onLogout={logout} />
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<div>Map View (Coming Soon)</div>} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/admin/items" /> : <Login />} />
           <Route
             path="/admin/*"
             element={
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin-check"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <AdminCheck />
               </ProtectedRoute>
             }
           />

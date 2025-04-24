@@ -21,6 +21,7 @@ import {
 import { db } from './firebase.js'; // ADDED .js extension
 
 const itemsCollectionRef = collection(db, 'Items');
+const dealsCollectionRef = collection(db, 'Deals');
 
 /**
  * Creates a new item document in Firestore.
@@ -205,6 +206,195 @@ export const deleteItem = async (id) => {
 // Add functions for batch operations if needed
 // Add functions for real-time subscriptions if needed
 
+// Deal-related Firebase functions
+
+/**
+ * Creates a new deal in Firestore.
+ * @param {object} dealData - The data for the new deal.
+ * @returns {Promise<object>} Object containing success status and the ID of the newly created document.
+ */
+export const addDeal = async (dealData) => {
+  try {
+    const docRef = await addDoc(dealsCollectionRef, {
+      ...dealData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    
+    return {
+      success: true,
+      id: docRef.id
+    };
+  } catch (e) {
+    console.error("Error adding deal: ", e);
+    throw new Error("Failed to add deal");
+  }
+};
+
+/**
+ * Retrieves a single deal document from Firestore by its ID.
+ * @param {string} id - The ID of the deal document to retrieve.
+ * @returns {Promise<object|null>} The deal data or null if not found.
+ */
+export const getDeal = async (id) => {
+  try {
+    const docRef = doc(db, "Deals", id);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return {
+        success: true,
+        data: { id: docSnap.id, ...docSnap.data() }
+      };
+    } else {
+      return {
+        success: false,
+        error: "Deal not found"
+      };
+    }
+  } catch (e) {
+    console.error("Error getting deal: ", e);
+    throw new Error("Failed to get deal");
+  }
+};
+
+/**
+ * Retrieves deal documents from Firestore, applying various filters and sorting.
+ * @param {object} [options] - Query options
+ * @param {string} [options.itemId] - Filter by associated item ID
+ * @param {boolean} [options.activeOnly] - Filter only active deals if true
+ * @param {boolean} [options.currentOnly] - Filter deals that are currently valid (not expired)
+ * @param {string} [options.sortBy] - Field to sort by (title, startDate, endDate, etc.)
+ * @param {boolean} [options.sortDesc] - Sort in descending order if true
+ * @param {number} [options.limitTo] - Limit number of results
+ * @returns {Promise<object[]>} An array of deal objects.
+ */
+export const queryDeals = async (options = {}) => {
+  try {
+    // --- REVERTING TEMPORARY SIMPLIFICATION ---
+    // console.log('Attempting simplified queryDeals...');
+    // const querySnapshot = await getDocs(dealsCollectionRef); // Get all docs without constraints
+    let queryConstraints = [];
+    
+    // Item ID filter
+    if (options.itemId) {
+      queryConstraints.push(where('itemId', '==', options.itemId));
+    }
+    
+    // Active deals only
+    if (options.activeOnly) {
+      queryConstraints.push(where('status.isActive', '==', true));
+    }
+    
+    // Current deals only (not expired)
+    if (options.currentOnly) {
+      const now = new Date();
+      queryConstraints.push(where('validity.endDate', '>=', now));
+    }
+    
+    // Sort options
+    if (options.sortBy) {
+      const sortDirection = options.sortDesc ? 'desc' : 'asc';
+      queryConstraints.push(orderBy(options.sortBy, sortDirection));
+    } else {
+      // Default sort by title
+      queryConstraints.push(orderBy('title', 'asc'));
+    }
+    
+    // Limit results
+    if (options.limitTo && typeof options.limitTo === 'number') {
+      queryConstraints.push(limit(options.limitTo));
+    }
+    
+    // Execute query
+    const q = query(dealsCollectionRef, ...queryConstraints);
+    const querySnapshot = await getDocs(q);
+    // --- END OF REVERTED SIMPLIFICATION ---
+    
+    const deals = [];
+    querySnapshot.forEach((doc) => {
+      // Combine doc id with data
+      deals.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // console.log(`Simplified queryDeals fetched ${deals.length} documents.`); // Remove log
+    return deals;
+  } catch (e) {
+    console.error('Error querying deal documents: ', e);
+    throw new Error('Failed to query deals');
+  }
+};
+
+/**
+ * Updates an existing deal document in Firestore.
+ * @param {string} id - The ID of the deal document to update.
+ * @param {object} updatedData - An object containing the fields to update.
+ * @returns {Promise<void>}
+ */
+export const updateDeal = async (id, dealData) => {
+  try {
+    const dealRef = doc(db, "Deals", id);
+    await updateDoc(dealRef, {
+      ...dealData,
+      updatedAt: serverTimestamp()
+    });
+    
+    return {
+      success: true,
+      id
+    };
+  } catch (e) {
+    console.error("Error updating deal: ", e);
+    throw new Error("Failed to update deal");
+  }
+};
+
+/**
+ * Deletes an existing deal document from Firestore.
+ * @param {string} id - The ID of the deal document to delete.
+ * @returns {Promise<void>}
+ */
+export const deleteDeal = async (id) => {
+  try {
+    const dealRef = doc(db, "Deals", id);
+    await deleteDoc(dealRef);
+    
+    return {
+      success: true
+    };
+  } catch (e) {
+    console.error("Error deleting deal: ", e);
+    throw new Error("Failed to delete deal");
+  }
+};
+
+export const getDeals = async () => {
+  try {
+    const q = query(
+      dealsCollectionRef,
+      orderBy("createdAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const deals = [];
+    
+    querySnapshot.forEach((doc) => {
+      deals.push({ id: doc.id, ...doc.data() });
+    });
+    
+    return {
+      success: true,
+      data: deals
+    };
+  } catch (e) {
+    console.error("Error querying deal documents: ", e);
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+};
+
 // Export all functions
 export default {
   createItem,
@@ -212,4 +402,10 @@ export default {
   queryItems,
   updateItem,
   deleteItem,
+  addDeal,
+  getDeal,
+  queryDeals,
+  updateDeal,
+  deleteDeal,
+  getDeals,
 }; 

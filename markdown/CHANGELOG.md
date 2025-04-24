@@ -133,6 +133,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added checks before all state updates to prevent setState calls after unmounting
   - Applied the pattern to all asynchronous operations to prevent memory leaks
 - Fixed DealForm by changing reference from 'createDeal' to 'addDeal' to match the existing function in firestoreService
+- Fixed critical issue with deals not saving to Firestore:
+  - Corrected collection references in firestoreService.js to use the proper 'Deals' collection
+  - Fixed inconsistency where deals were being saved to 'Items' collection but queried from 'Deals'
+  - Added proper dealsCollectionRef initialization
+  - Enhanced deal data structure with proper analytics and status fields
 
 ## [0.1.0] - 2024-03-XX
 - Initial project setup and basic structure implementation

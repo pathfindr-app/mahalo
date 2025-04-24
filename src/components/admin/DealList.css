@@ -1,0 +1,43 @@
+.deal-list-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+.deal-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.deal-list-actions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.deal-list-loading, .deal-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.deal-list-table {
+  margin-bottom: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .deal-list-actions {
+    flex-direction: column;
+  }
+  
+  .deal-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+} 

@@ -9,6 +9,7 @@ This document outlines the file structure of the MAHALO project, provides descri
 ├── markdown/                   # Documentation files
 │   ├── APP_FLOW.md
 │   ├── CHANGELOG.md
+│   ├── CLOUD_FUNCTIONS_PROGRESS.md # Cloud Functions implementation status
 │   ├── CONFIG_DETAILS.md
 │   ├── CURRENT_TICKET.md
 │   ├── FILE_STRUCTURE.md       <-- This file
@@ -16,6 +17,11 @@ This document outlines the file structure of the MAHALO project, provides descri
 │   ├── NAMING_CONVENTIONS.md
 │   ├── PROJECT_PLAN.md
 │   └── tags.md
+├── functions/                  # Firebase Cloud Functions
+│   ├── index.js                # Main Cloud Functions implementation
+│   ├── package.json            # Functions dependencies
+│   ├── .eslintrc.js            # ESLint configuration for functions
+│   └── README.md               # Functions documentation
 ├── public/                     # Static assets and index.html
 │   └── index.html              # Main HTML page
 ├── src/                        # Application source code
@@ -28,11 +34,19 @@ This document outlines the file structure of the MAHALO project, provides descri
 │   │   │   ├── AdminDashboard.css
 │   │   │   └── AdminDashboard.js # Main dashboard component for admin users
 │   │   │   └── ItemList.js       # Component to display a list of items (likely in admin)
+│   │   │   ├── NotificationsComponent.js # Displays admin notifications from Cloud Functions
+│   │   │   ├── NotificationsComponent.css
+│   │   │   ├── DealAnalytics.js # Displays analytics data for deals
+│   │   │   └── DealAnalytics.css
 │   │   ├── auth/               # Authentication related components
 │   │   │   └── Login.js        # Login form component
 │   │   ├── common/             # Common components used across the application
 │   │   │   ├── Header.css
 │   │   │   └── Header.js       # Application header component
+│   │   │   ├── ImageUploader.css
+│   │   │   └── ImageUploader.js # Component for uploading and managing images
+│   │   │   ├── DraggableGallery.css
+│   │   │   └── DraggableGallery.js # Component for reordering gallery images with drag-and-drop
 │   │   ├── items/              # Components related to item display or forms
 │   │   │   ├── ItemForm.css
 │   │   │   └── ItemForm.js     # Comprehensive form for creating/editing items (details, location, tags, etc.).
@@ -49,7 +63,9 @@ This document outlines the file structure of the MAHALO project, provides descri
 │   │   └── ItemManagementPage.js # Page wrapper for creating/editing items using ItemForm.
 │   ├── services/               # Business logic, API calls, external services
 │   │   ├── firebase.js         # Firebase configuration and initialization
-│   │   └── firestoreService.js # Provides CRUD (Create, Read, Update, Delete) functions specifically for the `Items` collection in Firestore, including automatic timestamp handling
+│   │   ├── firestoreService.js # Provides CRUD functions for the `Items` collection
+│   │   ├── cloudFunctionsService.js # Provides methods to interact with Cloud Functions
+│   │   └── storageService.js   # Handles Firebase Storage operations for image uploads
 │   ├── styles/                 # Global or shared styles (potential overlap with index.css/App.css)
 │   │   ├── App.css             # (Duplicate or specific App styles?)
 │   │   ├── MapContainer.css
@@ -64,6 +80,11 @@ This document outlines the file structure of the MAHALO project, provides descri
 ## File/Directory Descriptions
 
 *   **`markdown/`**: Contains all project documentation, including planning, implementation details, conventions, and this structure guide.
+*   **`functions/`**: Contains files related to Firebase Cloud Functions.
+    *   **`index.js`**: Main Cloud Functions implementation.
+    *   **`package.json`**: Functions dependencies.
+    *   **`.eslintrc.js`**: ESLint configuration for functions.
+    *   **`README.md`**: Functions documentation.
 *   **`public/`**: Holds static assets served directly by the webserver. `index.html` is the entry point for the browser.
 *   **`src/`**: Core directory containing all the React application's source code.
     *   **`App.css`**: Styles specific to the main `App` component.
@@ -78,6 +99,8 @@ This document outlines the file structure of the MAHALO project, provides descri
             *   `Login.js`: Provides the user interface for logging in.
         *   **`common/`**: Components shared across different parts of the application.
             *   `Header.js`: The site-wide header, likely displaying navigation, user status, and logout options.
+            *   `ImageUploader.js`: Allows users to upload single or multiple images to Firebase Storage, with preview, delete, and edit functionality.
+            *   `DraggableGallery.js`: Provides drag-and-drop functionality for reordering gallery images using @dnd-kit libraries.
         *   **`items/`**: Components specifically for handling 'items' (products, listings, etc.).
             *   `ItemForm.js`: A large, multi-section form component responsible for both creating new items and editing existing ones. It manages complex nested state for item properties (name, type, description, location, parking, presentation, tags, status), integrates `MapPicker` for coordinate selection, uses `react-select` for tag management, performs client-side validation, and handles submission via `firestoreService` functions (`createItem`, `updateItem`).
         *   **`map/`**: Components related to map features.
@@ -92,7 +115,9 @@ This document outlines the file structure of the MAHALO project, provides descri
         *   `ItemManagementPage.js`: Provides a dedicated page view for the `ItemForm` component, handling surrounding UI elements like titles, descriptions, post-submission notifications, and navigation.
     *   **`services/`**: Contains modules for handling side effects, external API interactions, and business logic.
         *   `firebase.js`: Configures and initializes the Firebase SDK.
-        *   `firestoreService.js`: Provides CRUD (Create, Read, Update, Delete) functions specifically for the `Items` collection in Firestore, including automatic timestamp handling
+        *   `firestoreService.js`: Provides CRUD (Create, Read, Update, Delete) functions specifically for the `Items` collection in Firestore, including automatic timestamp handling.
+        *   `cloudFunctionsService.js`: Provides methods to interact with Cloud Functions.
+        *   `storageService.js`: Handles interactions with Firebase Storage, including uploading, deleting, and retrieving images.
     *   **`styles/`**: Contains additional CSS files. *Note: There might be overlap or redundancy with `index.css` and `App.css` at the root `src` level. Consolidating might be beneficial.*
     *   **`utils/`**: Holds miscellaneous helper functions, constants, or common utilities.
         *   `constants.js`: Defines shared constant values (e.g., API keys, map settings, POI types, tags, error messages) used elsewhere in the application.
