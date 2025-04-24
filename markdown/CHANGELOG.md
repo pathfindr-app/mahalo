@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Mapbox GL and Leaflet for map functionality
     - Material UI for components
     - LocalForage for offline storage
+    - @dnd-kit libraries for drag and drop functionality
 
 - Core Components
   - Created main App component with React Router setup
@@ -77,9 +78,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Defined ACTIVITY_TAGS constant in utils/constants.js
   - Implemented multi-select checkbox group for Activity Tags in ItemForm
   - Added tags field to form state and submission data
+  - Implemented rich text editor using Draft.js and react-draft-wysiwyg for detailed descriptions
+  - Added ImageUploader component for header and gallery images with Firebase Storage integration
+  - Created DraggableGallery component with drag-and-drop functionality for reordering gallery images
+  - Enhanced parking information section with MapPicker for parking coordinates
 
 - Added configuration details documentation (`markdown/CONFIG_DETAILS.md`)
 - Planned development of a comprehensive item management dashboard including item listing, searching, and editing capabilities.
+
+- Cloud Functions implementation for deal analytics, real-time updates, and background processing
+- Client-side service for interacting with Cloud Functions
+- UI components for notifications and analytics display
+- Added detailed documentation in CLOUD_FUNCTIONS_PROGRESS.md
+
+- Deal Management Implementation
+  - Created DealForm component with rich text editing for description and terms
+  - Added DealList component with filtering, sorting, and search capabilities
+  - Implemented date pickers for deal validity period using @mui/x-date-pickers
+  - Created Firebase service functions for deal CRUD operations
+  - Added vendor selection to link deals with vendor items
+  - Implemented deal analytics structure with claims tracking
+  - Added deal status tracking (Active/Inactive/Expired/Fully Claimed)
+  - Enhanced AdminDashboard with integrated deal management tab
 
 ### Changed
 - Updated import statements to use .js extensions for ES modules compatibility
@@ -92,6 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored MapPicker useEffect hooks to separate initialization and updates
 - Replaced basic tag checkbox group with searchable multi-select component (`react-select`) in `ItemForm`.
 - Updated `ItemForm` to use comprehensive `ALL_TAGS` list from `constants.js`.
+- Restructured ItemForm into logical sections with conditional rendering based on item type
+- Enhanced Image management with proper ordering, preview functionality, and deletion options
 
 ### Fixed
 - Resolved module resolution errors by adding explicit .js extensions to imports
@@ -105,6 +127,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjusted z-index values in ItemForm.css to ensure map controls render above map canvas
 - Resolved Google Sign-in `redirect_uri_mismatch` error by correcting Firebase/Google Cloud OAuth configuration.
 - Corrected `firebase.js` configuration to match the active `MahaloRewardsCard` Firebase project.
+- Fixed React warnings about trying to update state on unmounted components:
+  - Added isMountedRef to both ItemForm and MapPicker components
+  - Implemented proper cleanup on component unmount to set the flag to false
+  - Added checks before all state updates to prevent setState calls after unmounting
+  - Applied the pattern to all asynchronous operations to prevent memory leaks
+- Fixed DealForm by changing reference from 'createDeal' to 'addDeal' to match the existing function in firestoreService
 
 ## [0.1.0] - 2024-03-XX
-- Initial project setup and basic structure implementation 
+- Initial project setup and basic structure implementation
+
+## 2024-04-24
+### Fixed
+- **Critical:** Fixed Firebase admin authentication by ensuring admin claims were set on the correct project
+- **Security:** Properly deployed Firestore security rules to the correct Firebase project (mahalorewardscard)
+- **Configuration:** Updated Firebase CLI configuration to use the correct project
+- **Documentation:** Added detailed notes in CONFIG_DETAILS.md and FIREBASE_IMPLEMENTATION.md about project configuration
+- **Admin Workflow:** Created and documented process for setting admin privileges via Firebase Admin SDK
+### Added
+- Created AdminCheck component for verifying admin status
+- Added token refresh functionality for admin authentication 

@@ -8,6 +8,7 @@
 - Data models defined in `CURRENT_TICKET.md`
 - Security rules outlined but not implemented - *Need to implement for non-test users*
 - Added `markdown/CONFIG_DETAILS.md` for core configurations.
+- Implemented Firebase Storage for image uploads - *Created storageService.js with upload/delete functionality*
 
 ## Implementation Phases
 
@@ -77,18 +78,23 @@
 
 #### Tasks
 1. Create base CRUD operations for Items - *(Basic `createItem` working via ItemForm submission)*
-   - [ ] Implement `queryItems` with filtering/sorting options
-   - [ ] Implement `getItem`
-   - [ ] Implement `updateItem`
-   - [ ] Implement `deleteItem`
+   - [✓] Implement `queryItems` with filtering/sorting options
+   - [✓] Implement `getItem`
+   - [✓] Implement `updateItem`
+   - [✓] Implement `deleteItem`
 2. Create base CRUD operations for Deals
-3. Implement query builders with proper indexing
+   - [✓] Implement `createDeal`
+   - [✓] Implement `getDeal`
+   - [✓] Implement `queryDeals` with filtering/sorting options
+   - [✓] Implement `updateDeal`
+   - [✓] Implement `deleteDeal`
+3. Implement query builders with proper indexing *(Basic implementation for Items and Deals)*
 4. Add batch operation support
 5. Create real-time subscription methods
 6. Add proper error handling and validation
 7. Implement optimistic updates where appropriate
 
-### Phase 3: Storage Service Layer
+### Phase 3: Storage Service Layer - *Partially implemented*
 ```javascript
 // src/services/storageService.js structure
 {
@@ -101,13 +107,13 @@
 ```
 
 #### Tasks
-1. Create image upload functionality
-2. Implement image optimization
-3. Add proper file type validation
-4. Create deletion cleanup
-5. Implement URL caching
-6. Add upload progress tracking
-7. Create batch upload capabilities
+1. ✅ Create image upload functionality *(Implemented with proper path organization)*
+2. ✅ Add proper file type validation *(Added size and type validation in ImageUploader)*
+3. ✅ Create deletion cleanup *(Implemented deleteImage function)*
+4. ✅ Add upload progress tracking *(Basic implementation in ImageUploader component)*
+5. [ ] Implement image optimization
+6. [ ] Implement URL caching 
+7. [ ] Create batch upload capabilities *(Basic functionality available in ImageUploader but needs refinement)*
 
 ### Phase 4: Security Rules Implementation
 ```javascript
@@ -142,13 +148,49 @@ service cloud.firestore {
 ```
 
 #### Tasks
-1. Implement and deploy base security rules - *(Currently allows writes only for authenticated admin, needs refinement and testing, especially for test user mode)*
+1. Implement and deploy base security rules - *(Completed and deployed to the correct `mahalorewardscard` project on 2024-04-24)*
 2. Create validation functions
 3. Add rate limiting rules
 4. Implement data validation rules
 5. Add proper error messages
 6. Test rules with security rules simulator
 7. Document all security rules
+
+#### Admin Setup (Added 2024-04-24)
+The following method was used to properly set up admin privileges:
+
+1. Create a Node.js script using the Firebase Admin SDK:
+```javascript
+const admin = require('firebase-admin');
+
+// Initialize admin for the mahalorewardscard project
+const app = admin.initializeApp({
+  credential: admin.credential.cert(require('./mahalorewardscard-firebase-adminsdk-fbsvc-b43e985619.json'))
+});
+
+// The user UID
+const uid = 'USER_UID_HERE';
+
+// Set the admin claim
+admin.auth().setCustomUserClaims(uid, { admin: true })
+  .then(() => {
+    console.log('Admin claim successfully set');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Error setting admin claim:', error);
+    process.exit(1);
+  });
+```
+
+2. Run the script with Node.js: `node set-admin.js`
+3. Have the user sign out and sign back in to refresh their token
+4. Verify admin status using the AdminCheck component or by checking `auth.currentUser.getIdTokenResult()`
+
+**Important Notes:**
+- Ensure the Firebase CLI is configured to use the correct project with `firebase use mahalorewardscard`
+- Deploy Firestore security rules to the correct project with `firebase deploy --only firestore:rules`
+- Always verify admin claims are set on the same project that the app is using
 
 ### Phase 5: Analytics Integration
 ```javascript
@@ -231,3 +273,27 @@ service cloud.firestore {
 - Real-time updates should be optimized for performance
 - Security rules should be thoroughly tested
 - Analytics should be GDPR compliant 
+
+## Firebase Services Used
+
+1. **Authentication**
+   - Email/Password authentication for basic user login
+   - Google authentication for social login option
+   - Admin claims to control access to admin features
+
+2. **Firestore Database**
+   - Collection-based document structure
+   - Structured data model for items and their related data
+   - Query capabilities for filtering and sorting items
+
+3. **Storage**
+   - Image storage for item header images and galleries
+   - Organized folder structure by item ID
+   - Proper metadata and security rules
+
+4. **Cloud Functions**
+   - Deal analytics tracking and reporting
+   - Automatic deal status management
+   - Notification generation for important events
+   - Background data processing and maintenance tasks
+   - See [CLOUD_FUNCTIONS_PROGRESS.md](./CLOUD_FUNCTIONS_PROGRESS.md) for detailed implementation status 
