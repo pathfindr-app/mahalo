@@ -36,6 +36,7 @@ const MapContainer = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const markers = useRef({});
+  const moveEndTimeout = useRef(null); // Add a ref for the timeout
 
   // Function to create item markers on the map
   const createItemMarkers = () => {
@@ -46,14 +47,28 @@ const MapContainer = () => {
 
     console.log('Creating markers for', items.length, 'items');
     
-    // Clear existing markers
-    Object.values(markers.current).forEach(marker => marker.remove());
-    markers.current = {};
+    // Check which markers already exist to avoid recreating them
+    const existingMarkerIds = Object.keys(markers.current);
+    const newItemIds = items.map(item => item.id);
+    
+    // Remove markers that no longer exist in items
+    existingMarkerIds.forEach(id => {
+      if (!newItemIds.includes(id)) {
+        console.log(`Removing marker for deleted item: ${id}`);
+        markers.current[id].remove();
+        delete markers.current[id];
+      }
+    });
     
     let successCount = 0;
     let failCount = 0;
     
-    // Create new markers for each item
+    // Disable map move events temporarily while adding markers
+    // This prevents jank during marker creation
+    const moveHandler = map.current._handlers && map.current._handlers.move;
+    if (moveHandler) moveHandler.disable();
+    
+    // Create new markers (or update existing ones) for each item
     items.forEach(item => {
       try {
         if (!item.location?.coordinates?.lat || !item.location?.coordinates?.lng) {
@@ -69,6 +84,13 @@ const MapContainer = () => {
         if (isNaN(lat) || isNaN(lng)) {
           console.log('Item has invalid coordinates:', item.id, item.name);
           failCount++;
+          return;
+        }
+        
+        // If marker already exists, just update its position
+        if (markers.current[item.id]) {
+          markers.current[item.id].setLngLat([lng, lat]);
+          successCount++;
           return;
         }
         
@@ -151,6 +173,9 @@ const MapContainer = () => {
       }
     });
     
+    // Re-enable map move events
+    if (moveHandler) moveHandler.enable();
+    
     console.log(`Marker creation complete: ${successCount} successful, ${failCount} failed`);
   };
 
@@ -159,7 +184,7 @@ const MapContainer = () => {
     if (!map.current || !map.current.loaded()) return;
 
     const { longitude, latitude, accuracy } = position.coords;
-    setUserLocation({ lng: longitude, lat: latitude, accuracy });
+    setUserLocation({ lng: longitude, lat: latitude, accuracy }); // Keep accuracy for UI display
 
     try {
       // Create or update marker
@@ -174,39 +199,8 @@ const MapContainer = () => {
 
       userMarker.current.setLngLat([longitude, latitude]).addTo(map.current);
 
-      // Create or update accuracy circle
-      if (map.current.loaded() && map.current.getStyle()) {
-        const accuracyRadius = {
-          'type': 'Feature',
-          'properties': {},
-          'geometry': {
-            'type': 'Point',
-            'coordinates': [longitude, latitude]
-          }
-        };
+      // We've removed the accuracy circle that was distracting during zoom out
 
-        if (map.current.getSource('accuracy-circle')) {
-          map.current.getSource('accuracy-circle').setData(accuracyRadius);
-        } else {
-          map.current.addSource('accuracy-circle', {
-            'type': 'geojson',
-            'data': accuracyRadius
-          });
-
-          map.current.addLayer({
-            'id': 'accuracy-circle',
-            'type': 'circle',
-            'source': 'accuracy-circle',
-            'paint': {
-              'circle-radius': accuracy / 2,
-              'circle-color': '#2196F3',
-              'circle-opacity': 0.2,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#2196F3'
-            }
-          });
-        }
-      }
     } catch (err) {
       console.error('Error updating user location:', err);
     }
@@ -313,14 +307,23 @@ const MapContainer = () => {
         console.log('Initializing map...');
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/outdoors-v12',
+          style: 'mapbox://styles/mapbox/light-v11', // Use a lighter style for better performance
           center: [viewport.lng, viewport.lat],
           zoom: viewport.zoom,
-          minZoom: 8, // Restrict zooming out too far
+          minZoom: 5, // Allow zooming out further (was 8)
           maxBounds: [
-            [-156.8, 20.5], // Southwest coordinates (restricting to Maui area)
-            [-155.9, 21.0]  // Northeast coordinates
-          ]
+            [-157.5, 19.5], // Southwest coordinates (expanded beyond Maui)
+            [-155.0, 22.0]  // Northeast coordinates (expanded beyond Maui)
+          ],
+          renderWorldCopies: false, // Prevents duplicate markers when panning
+          attributionControl: false, // We'll add this separately
+          antialias: true, // Smoother rendering
+          cooperativeGestures: false, // DISABLED - allow regular mousewheel zoom without Ctrl
+          dragRotate: false, // Disable rotation to simplify navigation
+          localIdeographFontFamily: "'Noto Sans', 'Noto Sans CJK SC', sans-serif", // Faster font loading
+          fadeDuration: 0, // Disable fading animations for better performance
+          trackResize: true,
+          maxPitch: 0 // Keep the map flat for better performance
         });
 
         // Add navigation controls
@@ -335,6 +338,9 @@ const MapContainer = () => {
           }),
           'top-right'
         );
+        
+        // Add attribution in the bottom right (since we disabled the default)
+        map.current.addControl(new mapboxgl.AttributionControl(), 'bottom-right');
 
         // Watch user's location
         if (navigator.geolocation) {
@@ -363,6 +369,34 @@ const MapContainer = () => {
           }
         });
         
+        // Reduce rendering during active panning to improve performance
+        map.current.on('movestart', () => {
+          // Set a CSS class on the container to optimize rendering during movement
+          mapContainer.current.classList.add('map-moving');
+        });
+        
+        // Add event listeners for viewport updates with more aggressive debouncing
+        map.current.on('moveend', () => {
+          // Remove the moving class to restore normal rendering
+          mapContainer.current.classList.remove('map-moving');
+          
+          // Only update viewport state when the map stops moving
+          // This prevents constant re-renders during panning
+          if (moveEndTimeout.current) {
+            clearTimeout(moveEndTimeout.current);
+          }
+          
+          moveEndTimeout.current = setTimeout(() => {
+            if (map.current) {
+              setViewport({
+                lng: map.current.getCenter().lng.toFixed(4),
+                lat: map.current.getCenter().lat.toFixed(4),
+                zoom: map.current.getZoom().toFixed(2)
+              });
+            }
+          }, 300); // Increased timeout for better performance
+        });
+        
         map.current.on('error', (e) => {
           console.error('Mapbox error:', e);
           setError('An error occurred with the map. Please try refreshing the page.');
@@ -379,6 +413,11 @@ const MapContainer = () => {
 
     // Cleanup function
     return () => {
+      // Clear the timeout if it exists
+      if (moveEndTimeout.current) {
+        clearTimeout(moveEndTimeout.current);
+      }
+      
       if (userMarker.current) {
         userMarker.current.remove();
         userMarker.current = null;
@@ -397,9 +436,9 @@ const MapContainer = () => {
         map.current = null;
       }
     };
-  }, [viewport, items]);
+  }, []); // Remove viewport and items from dependency array to prevent map reinitialization
 
-  // Create markers when map is loaded and items are available
+  // Create markers when items change
   useEffect(() => {
     if (map.current && map.current.loaded() && items.length > 0) {
       // Extra check to make sure the style is loaded
@@ -421,6 +460,43 @@ const MapContainer = () => {
     }
   }, [items]);
 
+  // Update the map view when viewport changes (but don't reinitialize map)
+  useEffect(() => {
+    // Skip expensive animations if the map isn't initialized
+    if (!map.current || !map.current.loaded()) return;
+    
+    // Get current values from the map
+    const currentCenter = map.current.getCenter();
+    const currentZoom = map.current.getZoom();
+    
+    // Calculate if the change is significant enough to animate
+    const centerChanged = 
+      Math.abs(currentCenter.lng - parseFloat(viewport.lng)) > 0.001 || 
+      Math.abs(currentCenter.lat - parseFloat(viewport.lat)) > 0.001;
+    
+    const zoomChanged = Math.abs(currentZoom - parseFloat(viewport.zoom)) > 0.1;
+    
+    // Only animate if there's a significant change
+    if (centerChanged || zoomChanged) {
+      // For small zoom changes, use jumpTo instead of flyTo for better performance
+      if (!centerChanged && zoomChanged && Math.abs(currentZoom - parseFloat(viewport.zoom)) < 1) {
+        map.current.jumpTo({
+          zoom: parseFloat(viewport.zoom)
+        });
+      } else {
+        // Use flyTo for significant changes
+        map.current.flyTo({
+          center: [parseFloat(viewport.lng), parseFloat(viewport.lat)],
+          zoom: parseFloat(viewport.zoom),
+          essential: true,
+          speed: 2.0, // Faster animation
+          curve: 1,
+          easing: t => t
+        });
+      }
+    }
+  }, [viewport]);
+
   // Handle modal close
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -433,7 +509,16 @@ const MapContainer = () => {
   return (
     <div className="map-container">
       {isLoading && <div className="map-loading">Loading map...</div>}
-      <div ref={mapContainer} style={{ width: '100%', height: '100vh', position: 'relative' }} />
+      <div 
+        ref={mapContainer} 
+        style={{ 
+          width: '100%', 
+          height: '100vh', 
+          position: 'relative',
+          overflow: 'hidden' // Ensure content doesn't leak
+        }} 
+        className="mapboxgl-map-container" // Add class for CSS targeting
+      />
       <div style={{ 
         position: 'absolute', 
         bottom: '20px', 

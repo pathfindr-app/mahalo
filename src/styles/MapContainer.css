@@ -2,6 +2,30 @@
   position: relative;
   height: calc(100vh - 60px); /* Adjust based on your header height */
   width: 100%;
+  overflow: hidden;
+}
+
+.mapboxgl-map-container {
+  /* Forcing hardware acceleration */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  -moz-transform: translate3d(0, 0, 0);
+  -ms-transform: translate3d(0, 0, 0);
+  -o-transform: translate3d(0, 0, 0);
+  
+  /* Prevent any layout shifts */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  
+  /* Optimize rendering */
+  perspective: 1000;
+  -webkit-perspective: 1000;
+  
+  /* Fix any potential flickering */
+  will-change: transform;
+  
+  /* Ensure content doesn't leak */
+  overflow: hidden;
 }
 
 .map-container .mapboxgl-map {
@@ -10,6 +34,39 @@
   bottom: 0;
   left: 0;
   right: 0;
+  
+  /* Improve rendering performance */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Force hardware acceleration on canvas */
+.mapboxgl-canvas {
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Make sure mouse wheel zooming works without Ctrl key */
+.mapboxgl-canvas-container {
+  z-index: 0 !important;
+}
+
+.mapboxgl-canvas-container {
+  /* Proper rendering of the map canvas */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Make scrolling smoother */
+.mapboxgl-canvas-container.mapboxgl-interactive {
+  cursor: grab;
+}
+
+.mapboxgl-canvas-container.mapboxgl-interactive:active {
+  cursor: grabbing;
 }
 
 .map-overlay {
@@ -78,12 +135,12 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   z-index: 100;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .item-marker:hover {
-  transform: scale(1.1);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  filter: brightness(1.1);
 }
 
 /* Ensure mapboxgl-marker containers are visible and properly positioned */
@@ -98,10 +155,6 @@
 /* Ensure the marker container doesn't interfere with positioning */
 .mapboxgl-marker > * {
   pointer-events: auto !important;
-}
-
-.mapboxgl-canvas-container {
-  z-index: 0 !important;
 }
 
 /* Item tooltip */
@@ -149,4 +202,24 @@
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* Optimize rendering during map movement */
+.map-moving .mapboxgl-marker {
+  /* Reduce marker animation/transition during movement */
+  transition: none !important;
+  /* Optimize rendering by reducing visual quality during movement */
+  image-rendering: optimizeSpeed;
+}
+
+/* Disable marker hover effects during map movement for better performance */
+.map-moving .item-marker:hover {
+  transform: none !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  filter: none !important;
+}
+
+/* Add smooth transition back after movement ends */
+.mapboxgl-marker {
+  transition: transform 0.1s ease-out;
 } 
