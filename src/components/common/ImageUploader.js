@@ -17,7 +17,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
-import { uploadImage, deleteImage } from '../../services/storageService.js';
+import { uploadFile, deleteImage } from '../../services/storageService.js';
+import { auth } from '../../services/firebase.js';
 import './ImageUploader.css';
 
 const ImageUploader = ({
@@ -44,6 +45,21 @@ const ImageUploader = ({
     setIsUploading(true);
     setError(null);
 
+    // Log auth state before attempting upload
+    console.log('Current auth state:', auth.currentUser);
+    if (!auth.currentUser) {
+      setError('User not authenticated. Please log in again.');
+      setIsUploading(false);
+      return; // Stop if not authenticated
+    }
+
+    // Use a progress state for potentially multiple files
+    const uploadProgress = {}; 
+    const setProgress = (filename, progress) => {
+        // TODO: Implement progress display if needed
+        console.log(`Progress ${filename}: ${progress}%`);
+    }
+
     try {
       // For single image upload
       if (!allowMultiple) {
@@ -55,54 +71,88 @@ const ImageUploader = ({
           return;
         }
 
-        // Generate a unique path for this file
         const filename = generateUniqueFilename(file.name);
         const filePath = `${storagePath}/${filename}`;
         
-        // Upload the file to Firebase Storage
-        const downloadUrl = await uploadImage(file, filePath);
+        console.log(`Uploading file ${filename} via SDK to path: ${filePath}`);
         
-        // Notify parent component about the uploaded image
-        onImageUploaded(downloadUrl, filePath);
+        try {
+          // Use standard SDK upload method
+          const downloadUrl = await uploadFile(file, filePath, (progress) => setProgress(filename, progress));
+          
+          onImageUploaded(downloadUrl, filePath);
+          console.log('SDK Upload successful!', downloadUrl);
+        } catch (uploadError) {
+          console.error('SDK Upload error details:', uploadError);
+          setError(`Failed to upload image: ${uploadError.message || 'Unknown error'}`);
+          throw uploadError; // Re-throw to handle in outer catch
+        }
       } 
       // For multiple image uploads
       else {
-        const uploadedImages = [];
+        const uploadedImagesInfo = []; // Store {url, path, alt, order}
+        const uploadPromises = [];
+        const errors = [];
         
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const validationError = validateFile(file);
           if (validationError) {
             console.warn(`Skipping file ${file.name}: ${validationError}`);
+            errors.push(`${file.name}: ${validationError}`);
             continue;
           }
           
-          // Generate a unique path for this file
           const filename = generateUniqueFilename(file.name);
           const filePath = `${storagePath}/${filename}`;
           
-          // Upload the file to Firebase Storage
-          const downloadUrl = await uploadImage(file, filePath);
-          
-          uploadedImages.push({
-            url: downloadUrl,
-            path: filePath,
-            alt: filename,
-            order: images.length + i
-          });
+          console.log(`Uploading gallery file ${filename} via SDK to path: ${filePath}`);
+
+          // Create a promise for each upload
+          const uploadPromise = uploadFile(file, filePath, (progress) => setProgress(filename, progress))
+            .then(downloadUrl => {
+              uploadedImagesInfo.push({
+                url: downloadUrl,
+                path: filePath,
+                alt: filename, 
+                order: images.length + i // Maintain order based on original position
+              });
+              console.log(`Gallery image ${filename} SDK upload successful!`);
+            })
+            .catch(uploadError => {
+              console.error(`Error uploading ${filename} via SDK:`, uploadError);
+              errors.push(`${file.name}: ${uploadError.message || 'Upload failed'}`);
+            });
+            
+          uploadPromises.push(uploadPromise);
+        }
+
+        // Wait for all uploads to complete
+        await Promise.all(uploadPromises);
+        
+        // Notify parent component about all successfully uploaded images
+        if (uploadedImagesInfo.length > 0) {
+           // Sort uploaded images based on original index if needed (though order prop should suffice)
+           // uploadedImagesInfo.sort((a, b) => a.order - b.order); 
+          onImageUploaded(uploadedImagesInfo);
         }
         
-        // Notify parent component about all uploaded images
-        if (uploadedImages.length > 0) {
-          onImageUploaded(uploadedImages);
+        // Set error if any uploads failed
+        if (errors.length > 0) {
+          if (errors.length === files.length) {
+            setError(`All uploads failed. ${errors[0]}`);
+          } else {
+            setError(`${errors.length} out of ${files.length - errors.length + uploadedImagesInfo.length} uploads failed.`);
+          }
         }
       }
     } catch (err) {
-      console.error('Image upload failed:', err);
-      setError('Failed to upload image. Please try again.');
+      console.error('Image upload process failed:', err);
+      if (!error) { // Set a generic error if none was set during individual uploads
+        setError('Failed to upload image(s). Please try again.');
+      }
     } finally {
       setIsUploading(false);
-      // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -113,11 +163,15 @@ const ImageUploader = ({
     try {
       if (!allowMultiple) {
         // For single image
-        await deleteImage(imagePath);
+        if (imagePath) {
+          await deleteImage(imagePath);
+        }
         onImageDeleted();
       } else {
         // For gallery images
-        await deleteImage(imagePath);
+        if (imagePath) {
+          await deleteImage(imagePath);
+        }
         onImageDeleted(index);
       }
     } catch (err) {
@@ -257,7 +311,7 @@ const ImageUploader = ({
         </Grid>
       )}
 
-      {/* Image preview dialog */}
+      {/* Image Preview Dialog */}
       <Dialog open={previewOpen} onClose={closePreview} maxWidth="md">
         <DialogTitle>Image Preview</DialogTitle>
         <DialogContent>
@@ -282,16 +336,9 @@ ImageUploader.propTypes = {
   onImageDeleted: PropTypes.func.isRequired,
   title: PropTypes.string,
   allowMultiple: PropTypes.bool,
-  images: PropTypes.arrayOf(
-    PropTypes.shape({
-      url: PropTypes.string.isRequired,
-      path: PropTypes.string.isRequired,
-      alt: PropTypes.string,
-      order: PropTypes.number
-    })
-  ),
+  images: PropTypes.array,
   buttonLabel: PropTypes.string,
-  acceptedFileTypes: PropTypes.string
+  acceptedFileTypes: PropTypes.string,
 };
 
 export default ImageUploader; 

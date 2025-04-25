@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getItem, createItem, updateItem } from '../../services/firestoreService.js';
 import Select from 'react-select';
 import { db, auth } from '../../services/firebase.js';
@@ -29,7 +28,6 @@ import {
   DialogActions
 } from '@mui/material';
 import ImageUploader from '../common/ImageUploader.js';
-import DraggableGallery from '../common/DraggableGallery.js';
 
 // Rich text editor imports
 import { EditorState, ContentState, convertToRaw } from 'draft-js';
@@ -37,6 +35,9 @@ import { Editor } from 'react-draft-wysiwyg';
 import draftToHtml from 'draftjs-to-html';
 import htmlToDraft from 'html-to-draftjs';
 import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
+
+// Import uuid
+import { v4 as uuidv4 } from 'uuid';
 
 // Form steps based on CURRENT_TICKET.md
 const FORM_STEPS = {
@@ -103,6 +104,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [validationErrors, setValidationErrors] = useState({});
   const latestCoordsRef = useRef({ lat: null, lng: null }); // Ref for latest coords
   const isMountedRef = useRef(true);
+  const tempItemIdRef = useRef(null); // Ref to store temporary ID for new items
 
   // Add state for rich text editor
   const [editorState, setEditorState] = useState(EditorState.createEmpty());
@@ -265,6 +267,18 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       isMountedRef.current = false;
     };
   }, [itemId]);
+
+  // Determine the effective ID for storage paths (real or temporary)
+  const getStorageId = () => {
+      if (itemId) {
+          return itemId;
+      }
+      if (!tempItemIdRef.current) {
+          tempItemIdRef.current = uuidv4(); // Generate temp ID if it doesn't exist
+          console.log(`Generated temporary storage ID for new item: ${tempItemIdRef.current}`);
+      }
+      return tempItemIdRef.current;
+  };
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -439,7 +453,19 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
            }
         }
       },
-      tags: formData.tags || [], 
+      tags: formData.tags || [],
+      // Ensure image data is properly formatted
+      presentation: {
+        ...formData.presentation,
+        headerImage: formData.presentation.headerImage ? {
+          ...formData.presentation.headerImage,
+          // No processing needed - base64 data is already stored in the url field
+        } : null,
+        gallery: formData.presentation.gallery ? formData.presentation.gallery.map(img => ({
+          ...img,
+          // No processing needed - base64 data is already stored in the url field
+        })) : []
+      }
     };
 
     if (dataToSubmit.id) {
@@ -450,7 +476,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         delete dataToSubmit.status.updatedAt;
     }
 
-    console.log("Submitting data:", dataToSubmit);
+    console.log("Submitting item with base64 images");
 
     try {
       if (isEditing) {
@@ -512,72 +538,87 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     return EditorState.createEmpty();
   };
 
-  // Handle header image upload
-  const handleHeaderImageUpload = (imageUrl, imagePath) => {
-    setFormData(prevData => ({
-      ...prevData,
+  // Updated handler for Header Image upload using ImageUploader
+  const handleHeaderImageUpload = (downloadUrl, storagePath) => {
+    console.log("Header image uploaded to Storage:", downloadUrl, storagePath);
+    setFormData(prev => ({
+      ...prev,
       presentation: {
-        ...prevData.presentation,
+        ...prev.presentation,
         headerImage: {
-          url: imageUrl,
-          alt: formData.name || 'Header image',
-          path: imagePath
+          url: downloadUrl, // Store the Firebase Storage URL
+          alt: prev.name || 'Header image',
+          path: storagePath // Store the storage path for potential deletion
         }
       }
     }));
   };
 
-  // Handle header image deletion
-  const handleHeaderImageDelete = () => {
-    setFormData(prevData => ({
-      ...prevData,
+  // Updated handler for Header Image deletion
+  const handleHeaderImageDelete = async (imagePath) => { // ImageUploader passes path on delete
+    console.log("Attempting to delete Header image from Storage:", imagePath);
+    // ImageUploader handles the actual deletion in storageService.js triggered by its internal delete button
+    // We just need to update the form state
+    setFormData(prev => ({
+      ...prev,
       presentation: {
-        ...prevData.presentation,
-        headerImage: {
-          url: '',
-          alt: '',
-          path: ''
-        }
+        ...prev.presentation,
+        headerImage: null
       }
     }));
   };
 
-  // Handle gallery images upload
-  const handleGalleryImagesUpload = (newImages) => {
-    setFormData(prevData => ({
-      ...prevData,
-      presentation: {
-        ...prevData.presentation,
-        gallery: [...prevData.presentation.gallery, ...newImages]
-      }
-    }));
-  };
-
-  // Handle gallery image deletion
-  const handleGalleryImageDelete = (index) => {
-    setFormData(prevData => {
-      const updatedGallery = [...prevData.presentation.gallery];
-      updatedGallery.splice(index, 1);
-      
+  // Updated handler for Gallery Image uploads using ImageUploader (allowMultiple=true)
+  const handleGalleryImagesUpload = (uploadedImages) => { // Expects an array of {url, path, alt, order}
+    console.log("Gallery images uploaded to Storage:", uploadedImages);
+    setFormData(prev => {
+      const newGallery = [
+        ...(prev.presentation.gallery || []), // Keep existing images
+        ...uploadedImages.map((img, index) => ({ // Map uploaded images to correct format
+          url: img.url, // Storage URL
+          path: img.path, // Storage Path
+          alt: img.alt || `Gallery Image ${ (prev.presentation.gallery?.length || 0) + index + 1}`,
+          order: (prev.presentation.gallery?.length || 0) + index // Maintain order
+        }))
+      ];
       return {
-        ...prevData,
+        ...prev,
         presentation: {
-          ...prevData.presentation,
-          gallery: updatedGallery
+          ...prev.presentation,
+          gallery: newGallery
         }
       };
     });
   };
 
-  // Handle gallery image reordering
-  const handleGalleryReorder = (newOrderedGallery) => {
-    setFormData(prevData => ({
-      ...prevData,
+  // Updated handler for Gallery Image deletion
+  const handleGalleryImageDelete = (index, imagePath) => { // ImageUploader passes index and path
+    console.log("Attempting to delete Gallery image from Storage at index:", index, "path:", imagePath);
+    // ImageUploader handles the actual deletion in storageService.js triggered by its internal delete button
+    // We just need to update the form state by removing the image at the given index
+    setFormData(prev => ({
+      ...prev,
       presentation: {
-        ...prevData.presentation,
-        gallery: newOrderedGallery
+        ...prev.presentation,
+        gallery: prev.presentation.gallery.filter((_, i) => i !== index)
+          .map((img, i) => ({ ...img, order: i })) // Re-index order after deletion
       }
     }));
+  };
+
+  // Handler for Gallery Reorder (if ImageUploader provides it, otherwise needs separate implementation)
+  // Note: The basic ImageUploader might not have built-in drag-and-drop reordering.
+  // If reordering is needed, we might need DraggableGallery or similar logic again.
+  // For now, assuming basic upload/delete.
+  const handleGalleryReorder = (newOrderedGallery) => {
+     console.log("Reordering gallery:", newOrderedGallery);
+     setFormData(prev => ({
+         ...prev,
+         presentation: {
+             ...prev.presentation,
+             gallery: newOrderedGallery.map((img, index) => ({ ...img, order: index }))
+         }
+     }));
   };
 
   // Handle preview image
@@ -602,296 +643,325 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const isSubmitDisabled = loading;
 
   return (
-    <form onSubmit={handleSubmit} className="item-form modern" noValidate>
-      <div className="form-header">
-        <h2>{isEditing ? `Edit Item: ${formData.name || '(Loading...)'}` : 'Create New Item'}</h2>
-      </div>
+    <Dialog open={true} onClose={onCancel} maxWidth="md" fullWidth>
+      <DialogTitle>
+        {isEditing ? `Edit Item: ${formData.name || '(Loading...)'}` : 'Create New Item'}
+      </DialogTitle>
+      <DialogContent>
+        {loading && <CircularProgress />}
+        {fetchError && <Alert severity="error">{fetchError}</Alert>}
+        {!loading && !fetchError && (
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-sections">
+              <div className={`form-section active`}>
+                <div className="section-header">
+                  <h3>Basic Details</h3>
+                </div>
+                <div className="section-content">
+                  <div className="form-group">
+                    <label htmlFor="item-type">Type *</label>
+                    <select
+                      id="item-type"
+                      name="type"
+                      value={formData.type || ''}
+                      onChange={handleChange}
+                      required
+                      className={validationErrors.type ? 'error' : ''}
+                    >
+                      <option value="" disabled>Select Type</option>
+                      <option value="poi">Point of Interest (POI)</option>
+                      <option value="vendor">Vendor</option>
+                    </select>
+                    {validationErrors.type && <p className="error-message">{validationErrors.type}</p>}
+                  </div>
 
-      <div className="form-sections">
-        <div className={`form-section active`}>
-          <div className="section-header">
-            <h3>Basic Details</h3>
-          </div>
-          <div className="section-content">
-            <div className="form-group">
-              <label htmlFor="item-type">Type *</label>
-              <select
-                id="item-type"
-                name="type"
-                value={formData.type || ''}
-                onChange={handleChange}
-                required
-                className={validationErrors.type ? 'error' : ''}
-              >
-                <option value="" disabled>Select Type</option>
-                <option value="poi">Point of Interest (POI)</option>
-                <option value="vendor">Vendor</option>
-              </select>
-              {validationErrors.type && <p className="error-message">{validationErrors.type}</p>}
-            </div>
+                  <div className="form-group">
+                    <label htmlFor="item-name">Name *</label>
+                    <input
+                      type="text"
+                      id="item-name"
+                      name="name"
+                      value={formData.name || ''}
+                      onChange={handleChange}
+                      required
+                      placeholder="Enter the name of the item"
+                      className={validationErrors.name ? 'error' : ''}
+                    />
+                    {validationErrors.name && <p className="error-message">{validationErrors.name}</p>}
+                  </div>
 
-            <div className="form-group">
-              <label htmlFor="item-name">Name *</label>
-              <input
-                type="text"
-                id="item-name"
-                name="name"
-                value={formData.name || ''}
-                onChange={handleChange}
-                required
-                placeholder="Enter the name of the item"
-                className={validationErrors.name ? 'error' : ''}
-              />
-              {validationErrors.name && <p className="error-message">{validationErrors.name}</p>}
-            </div>
+                  <div className="form-group">
+                    <label htmlFor="presentation.icon">Icon (Text/Emoji)</label>
+                    <input
+                      type="text"
+                      id="presentation.icon"
+                      name="presentation.icon"
+                      value={formData.presentation?.icon || ''}
+                      onChange={handleChange}
+                      placeholder="Enter icon text or emoji 📍"
+                    />
+                  </div>
+                 
+                  <div className="form-group">
+                    <label htmlFor="description.brief">Brief Description * (for map tooltips)</label>
+                    <input
+                      type="text"
+                      id="description.brief"
+                      name="description.brief"
+                      value={formData.description?.brief || ''}
+                      onChange={handleChange}
+                      placeholder="Brief description"
+                      maxLength={150}
+                      required
+                      className={validationErrors.brief ? 'error' : ''}
+                    />
+                    {validationErrors.brief && <p className="error-message">{validationErrors.brief}</p>}
+                  </div>
+                  
+                  <div className="form-group">
+                      <label htmlFor="description.detailed">Detailed Description</label>
+                      <textarea
+                          id="description.detailed"
+                          name="description.detailed"
+                          value={formData.description?.detailed || ''}
+                          onChange={handleChange}
+                          placeholder="Detailed description (Markdown supported?)"
+                          rows={5}
+                      />
+                  </div>
 
-            <div className="form-group">
-              <label htmlFor="presentation.icon">Icon (Text/Emoji)</label>
-              <input
-                type="text"
-                id="presentation.icon"
-                name="presentation.icon"
-                value={formData.presentation?.icon || ''}
-                onChange={handleChange}
-                placeholder="Enter icon text or emoji 📍"
-              />
-            </div>
-           
-            <div className="form-group">
-              <label htmlFor="description.brief">Brief Description * (for map tooltips)</label>
-              <input
-                type="text"
-                id="description.brief"
-                name="description.brief"
-                value={formData.description?.brief || ''}
-                onChange={handleChange}
-                placeholder="Brief description"
-                maxLength={150}
-                required
-                className={validationErrors.brief ? 'error' : ''}
-              />
-              {validationErrors.brief && <p className="error-message">{validationErrors.brief}</p>}
-            </div>
-            
-            <div className="form-group">
-                <label htmlFor="description.detailed">Detailed Description</label>
-                <textarea
-                    id="description.detailed"
-                    name="description.detailed"
-                    value={formData.description?.detailed || ''}
-                    onChange={handleChange}
-                    placeholder="Detailed description (Markdown supported?)"
-                    rows={5}
-                />
-            </div>
+                  {/* Rich Text Editor for Detailed Description */}
+                  <div className="form-group">
+                    <label htmlFor="detailed-description">Detailed Description <span className="helper-text">(rich text format)</span></label>
+                    <div className="rich-text-editor-container">
+                      <Editor
+                        editorState={editorState}
+                        wrapperClassName="rich-text-editor-wrapper"
+                        editorClassName="rich-text-editor"
+                        onEditorStateChange={handleEditorStateChange}
+                        toolbar={{
+                          options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'history', 'embedded', 'emoji', 'image'],
+                          inline: { inDropdown: false },
+                          list: { inDropdown: true },
+                          textAlign: { inDropdown: true },
+                          link: { inDropdown: true },
+                          history: { inDropdown: false },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            {/* Rich Text Editor for Detailed Description */}
-            <div className="form-group">
-              <label htmlFor="detailed-description">Detailed Description <span className="helper-text">(rich text format)</span></label>
-              <div className="rich-text-editor-container">
-                <Editor
-                  editorState={editorState}
-                  wrapperClassName="rich-text-editor-wrapper"
-                  editorClassName="rich-text-editor"
-                  onEditorStateChange={handleEditorStateChange}
-                  toolbar={{
-                    options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'history', 'embedded', 'emoji', 'image'],
-                    inline: { inDropdown: false },
-                    list: { inDropdown: true },
-                    textAlign: { inDropdown: true },
-                    link: { inDropdown: true },
-                    history: { inDropdown: false },
-                  }}
-                />
+              <div className={`form-section active`}>
+                <div className="section-header">
+                  <h3>Location & Parking</h3>
+                </div>
+                <div className="section-content">
+                  <div className="form-group">
+                    <label>Location *</label>
+                    <MapPicker 
+                      initialLat={parseFloat(formData.location?.coordinates?.lat) || undefined}
+                      initialLng={parseFloat(formData.location?.coordinates?.lng) || undefined}
+                      onLocationSelect={handleLocationChange}
+                    />
+                    {validationErrors.locationCoordinates && <span className="error-message">{validationErrors.locationCoordinates}</span>}
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="parking-availability">Parking Availability</label>
+                    <select
+                      id="parking-availability"
+                      name="location.parking.availability"
+                      value={formData.location?.parking?.availability || 'none'}
+                      onChange={handleChange}
+                    >
+                      <option value="none">None</option>
+                      <option value="limited">Limited</option>
+                      <option value="ample">Ample</option>
+                    </select>
+                  </div>
+
+                  {formData.location?.parking?.availability !== 'none' && (
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="parking-description">Parking Description</label>
+                        <textarea
+                          id="parking-description"
+                          name="location.parking.description"
+                          value={formData.location?.parking?.description || ''}
+                          onChange={handleChange}
+                          placeholder="Describe parking situation (e.g., street parking, paid lot)"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="location.parking.cost">Parking Cost</label>
+                        <input
+                          type="text"
+                          id="location.parking.cost"
+                          name="location.parking.cost"
+                          value={formData.location?.parking?.cost || ''}
+                          onChange={handleChange}
+                          placeholder="e.g., Free, $5/hour"
+                        />
+                      </div>
+                      
+                      {/* Add MapPicker for parking coordinates */}
+                      <div className="form-group">
+                        <label>
+                          Parking Location Coordinates 
+                          <span className="helper-text">(where visitors should park)</span>
+                        </label>
+                        <MapPicker 
+                          initialLat={parseFloat(formData.location?.parking?.coordinates?.lat) || undefined}
+                          initialLng={parseFloat(formData.location?.parking?.coordinates?.lng) || undefined}
+                          onLocationSelect={handleParkingLocationChange}
+                          label="Parking Location"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className={`form-section active`}>
+                <div className="section-header">
+                  <h3>Tags</h3>
+                </div>
+                <div className="section-content">
+                  <div className="form-group">
+                    <label htmlFor="tags-select">Select Relevant Tags</label>
+                    <Select
+                      id="tags-select"
+                      isMulti
+                      name="tags"
+                      options={tagOptions}
+                      className="basic-multi-select"
+                      classNamePrefix="select"
+                      value={tagOptions.filter(option => (formData.tags || []).includes(option.value))}
+                      onChange={handleTagsChange}
+                      placeholder="Search and select tags..."
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className={`form-section active`}>
+                <div className="section-header">
+                  <h3>Visual Presentation</h3>
+                </div>
+                <div className="section-content">
+                  <div className="form-group">
+                    <label htmlFor="presentation.container.backgroundColor">Background Color</label>
+                    <input
+                      type="color"
+                      id="presentation.container.backgroundColor"
+                      name="presentation.container.backgroundColor"
+                      value={formData.presentation?.container?.backgroundColor || '#ffffff'}
+                      onChange={handleChange}
+                      className="color-input"
+                    />
+                  </div>
+
+                  <div className="form-group slider-group">
+                    <label htmlFor="presentation.container.opacity">
+                      Background Opacity: {formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}%
+                    </label>
+                    <input
+                      type="range"
+                      id="presentation.container.opacity"
+                      name="presentation.container.opacity"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}
+                      onChange={handleChange}
+                      className="slider-input"
+                    />
+                  </div>
+
+                  <div className="form-group slider-group">
+                    <label htmlFor="presentation.container.blur">
+                      Background Blur: {formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}px
+                    </label>
+                    <input
+                      type="range"
+                      id="presentation.container.blur"
+                      name="presentation.container.blur"
+                      min="0"
+                      max="20" // Max blur as per spec
+                      step="1"
+                      value={formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}
+                      onChange={handleChange}
+                      className="slider-input"
+                    />
+                  </div>
+
+                  {/* Header Image Upload - Using ImageUploader */}
+                  <div className="form-group">
+                    <ImageUploader
+                      title="Header Image"
+                      imageUrl={formData.presentation?.headerImage?.url || null}
+                      storagePath={`items/${getStorageId()}/header`}
+                      onImageUploaded={handleHeaderImageUpload}
+                      onImageDeleted={handleHeaderImageDelete} // Pass the handler
+                      allowMultiple={false}
+                      buttonLabel={formData.presentation?.headerImage?.url ? 'Replace Header Image' : 'Upload Header Image'}
+                    />
+                  </div>
+
+                  {/* Gallery Images Upload - Using ImageUploader */}
+                  <div className="form-group">
+                    <ImageUploader
+                      title="Gallery Images"
+                      images={formData.presentation?.gallery || []} // Pass the gallery array
+                      storagePath={`items/${getStorageId()}/gallery`}
+                      onImageUploaded={handleGalleryImagesUpload} // Handles multiple uploads
+                      onImageDeleted={handleGalleryImageDelete} // Pass the handler
+                      allowMultiple={true}
+                      buttonLabel="Add Gallery Images"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className={`form-section active`}>
-          <div className="section-header">
-            <h3>Location & Parking</h3>
-          </div>
-          <div className="section-content">
-            <div className="form-group">
-              <label>Location *</label>
-              <MapPicker 
-                initialLat={parseFloat(formData.location?.coordinates?.lat) || undefined}
-                initialLng={parseFloat(formData.location?.coordinates?.lng) || undefined}
-                onLocationSelect={handleLocationChange}
-              />
-              {validationErrors.locationCoordinates && <span className="error-message">{validationErrors.locationCoordinates}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="parking-availability">Parking Availability</label>
-              <select
-                id="parking-availability"
-                name="location.parking.availability"
-                value={formData.location?.parking?.availability || 'none'}
-                onChange={handleChange}
-              >
-                <option value="none">None</option>
-                <option value="limited">Limited</option>
-                <option value="ample">Ample</option>
-              </select>
-            </div>
-
-            {formData.location?.parking?.availability !== 'none' && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="parking-description">Parking Description</label>
-                  <textarea
-                    id="parking-description"
-                    name="location.parking.description"
-                    value={formData.location?.parking?.description || ''}
-                    onChange={handleChange}
-                    placeholder="Describe parking situation (e.g., street parking, paid lot)"
-                    rows={3}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="location.parking.cost">Parking Cost</label>
-                  <input
-                    type="text"
-                    id="location.parking.cost"
-                    name="location.parking.cost"
-                    value={formData.location?.parking?.cost || ''}
-                    onChange={handleChange}
-                    placeholder="e.g., Free, $5/hour"
-                  />
-                </div>
-                
-                {/* Add MapPicker for parking coordinates */}
-                <div className="form-group">
-                  <label>
-                    Parking Location Coordinates 
-                    <span className="helper-text">(where visitors should park)</span>
-                  </label>
-                  <MapPicker 
-                    initialLat={parseFloat(formData.location?.parking?.coordinates?.lat) || undefined}
-                    initialLng={parseFloat(formData.location?.parking?.coordinates?.lng) || undefined}
-                    onLocationSelect={handleParkingLocationChange}
-                    label="Parking Location"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className={`form-section active`}>
-          <div className="section-header">
-            <h3>Tags</h3>
-          </div>
-          <div className="section-content">
-            <div className="form-group">
-              <label htmlFor="tags-select">Select Relevant Tags</label>
-              <Select
-                id="tags-select"
-                isMulti
-                name="tags"
-                options={tagOptions}
-                className="basic-multi-select"
-                classNamePrefix="select"
-                value={tagOptions.filter(option => (formData.tags || []).includes(option.value))}
-                onChange={handleTagsChange}
-                placeholder="Search and select tags..."
-              />
-            </div>
-          </div>
-        </div>
-        
-        <div className={`form-section active`}>
-          <div className="section-header">
-            <h3>Visual Presentation</h3>
-          </div>
-          <div className="section-content">
-            <div className="form-group">
-              <label htmlFor="presentation.container.backgroundColor">Background Color</label>
-              <input
-                type="color"
-                id="presentation.container.backgroundColor"
-                name="presentation.container.backgroundColor"
-                value={formData.presentation?.container?.backgroundColor || '#ffffff'}
-                onChange={handleChange}
-                className="color-input"
-              />
-            </div>
-
-            <div className="form-group slider-group">
-              <label htmlFor="presentation.container.opacity">
-                Background Opacity: {formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}%
-              </label>
-              <input
-                type="range"
-                id="presentation.container.opacity"
-                name="presentation.container.opacity"
-                min="0"
-                max="100"
-                step="1"
-                value={formData.presentation?.container?.opacity !== undefined ? formData.presentation.container.opacity : 100}
-                onChange={handleChange}
-                className="slider-input"
-              />
-            </div>
-
-            <div className="form-group slider-group">
-              <label htmlFor="presentation.container.blur">
-                Background Blur: {formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}px
-              </label>
-              <input
-                type="range"
-                id="presentation.container.blur"
-                name="presentation.container.blur"
-                min="0"
-                max="20" // Max blur as per spec
-                step="1"
-                value={formData.presentation?.container?.blur !== undefined ? formData.presentation.container.blur : 0}
-                onChange={handleChange}
-                className="slider-input"
-              />
-            </div>
-
-            {/* Header Image Upload */}
-            <div className="form-group">
-              <ImageUploader
-                title="Header Image"
-                imageUrl={formData.presentation?.headerImage?.url || ''}
-                storagePath={itemId ? `items/${itemId}/header` : 'items/temp/header'}
-                onImageUploaded={handleHeaderImageUpload}
-                onImageDeleted={handleHeaderImageDelete}
-                buttonLabel="Upload Header Image"
-              />
-            </div>
-
-            {/* Gallery Images Upload */}
-            <div className="form-group">
-              <ImageUploader
-                title="Gallery Images"
-                allowMultiple={true}
-                images={formData.presentation?.gallery || []}
-                storagePath={itemId ? `items/${itemId}/gallery` : 'items/temp/gallery'}
-                onImageUploaded={handleGalleryImagesUpload}
-                onImageDeleted={handleGalleryImageDelete}
-                buttonLabel="Add Gallery Images"
-              />
-              
-              {/* Gallery order management */}
-              {formData.presentation?.gallery?.length > 1 && (
-                <DraggableGallery
-                  images={formData.presentation.gallery}
-                  onReorder={handleGalleryReorder}
-                  onDelete={handleGalleryImageDelete}
-                  onPreview={handlePreviewImage}
-                />
+            <div className="form-actions">
+              {submitError && (
+                <div className="submit-error error-message">Error: {submitError}</div>
               )}
+              <Button onClick={onCancel} color="primary" disabled={loading}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary" 
+                disabled={loading || Object.keys(validationErrors).length > 0}
+                onClick={handleSubmit} // Ensure button triggers submit
+              >
+                {loading ? 'Saving...' : (isEditing ? 'Update Item' : 'Create Item')}
+              </Button>
             </div>
-          </div>
-        </div>
-      </div>
+          </form>
+        )}
+      </DialogContent>
+      <DialogActions>
+        {submitError && <Alert severity="error" sx={{ ml: 2 }}>{submitError}</Alert>}
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button 
+          type="submit" 
+          variant="contained" 
+          color="primary" 
+          disabled={loading || Object.keys(validationErrors).length > 0}
+          onClick={handleSubmit} // Ensure button triggers submit
+        >
+          {isEditing ? 'Update Item' : 'Create Item'}
+        </Button>
+      </DialogActions>
 
-      {/* Preview Dialog */}
+      {/* Image Preview Dialog (Keep if needed) */}
       <Dialog open={previewOpen} onClose={closePreview} maxWidth="md">
         <DialogTitle>Image Preview</DialogTitle>
         <DialogContent>
@@ -905,24 +975,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <div className="form-actions">
-        {submitError && (
-          <div className="submit-error error-message">Error: {submitError}</div>
-        )}
-        <button 
-          type="button" 
-          onClick={onCancel} 
-          className="cancel-button" 
-          disabled={loading}
-        >
-          Cancel
-        </button>
-        <button type="submit" className="submit-button" disabled={isSubmitDisabled}>
-          {loading && !fetchError ? 'Saving...' : (isEditing ? 'Update Item' : 'Create Item')}
-        </button>
-      </div>
-    </form>
+    </Dialog>
   );
 }
 

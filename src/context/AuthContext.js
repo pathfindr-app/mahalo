@@ -23,13 +23,43 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setCurrentUser(user);
+    setLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const idTokenResult = await user.getIdTokenResult(true);
+          console.log("User claims:", idTokenResult.claims);
+          if (idTokenResult.claims.admin === true) {
+            console.log("User IS an admin.");
+          } else {
+            console.log("User is NOT an admin.");
+          }
+
+          const userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+          };
+          setCurrentUser(userData);
+          setError(null);
+
+        } catch (error) {
+          console.error("Error getting ID token result or processing user:", error);
+          setCurrentUser(null);
+          setError('Failed to process user data.');
+        }
+      } else {
+        console.log("No user logged in.");
+        setCurrentUser(null);
+        setError(null);
+      }
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const loginWithGoogle = () => {

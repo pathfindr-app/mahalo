@@ -250,8 +250,13 @@ service cloud.firestore {
 17. [X] Fix React warnings about setState on unmounted components *(Added isMountedRef pattern to ItemForm and MapPicker components)*
 18. [X] Update Firestore service for deals *(Fixed naming inconsistency between `addDeal` and `createDeal` functions)*
 19. [X] Fix critical issue with deals not being saved *(Fixed collection references in firestoreService.js to use the Deals collection consistently instead of Items collection)*
-20. [ ] **Frontend Map Integration** *(New Phase)*
-    - [ ] Create map view component that displays items as markers
+20. [✓] **Frontend Map Integration** *(Phase 6 - Partial Completion)*
+    - [X] Create map view component that displays items as markers
+    - [X] Fix markers not staying locked to GPS coordinates during map panning
+    - [X] Remove the accuracy circle around user's location that was affecting zoom out
+    - [X] Fix map performance issues causing jankiness when panning
+    - [X] Enable regular mousewheel zoom without requiring Ctrl key
+    - [X] Allow zooming out further to see more of the map area
     - [ ] Implement marker clustering for areas with many items
     - [ ] Create modal component for displaying item details when marker is clicked
     - [ ] Display item details in modal (description, images, location info)
@@ -259,10 +264,13 @@ service cloud.firestore {
     - [ ] Implement deal claiming functionality for users
 
 ## Phase 6: Map Integration
-1. [ ] Create MapView component
-   - [ ] Display all items as markers
-   - [ ] Implement custom markers based on item type
-   - [ ] Add tooltip with basic info on hover
+1. [✓] Create MapView component
+   - [X] Display all items as markers
+   - [X] Implement custom markers based on item type
+   - [X] Add tooltip with basic info on hover
+   - [X] Fix marker positioning issues during map movement
+   - [X] Optimize map performance for smooth panning and zooming
+   - [X] Improve map controls and zoom behavior
 2. [ ] Create ItemDetailModal component
    - [ ] Display comprehensive item details from ItemForm data
    - [ ] Show image gallery with carousel

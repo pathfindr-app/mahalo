@@ -5,6 +5,7 @@ import AdminDashboard from './components/admin/AdminDashboard.js';
 import Login from './components/auth/Login.js';
 import AdminCheck from './components/auth/AdminCheck.js';
 import HomePage from './pages/HomePage.js';
+import CorsErrorHandler from './components/common/CorsErrorHandler.js';
 import { useAuth } from './context/AuthContext.js';
 import './App.css';
 
@@ -58,6 +59,9 @@ function App() {
           />
         </Routes>
       </main>
+      
+      {/* Global CORS error handler */}
+      <CorsErrorHandler />
     </div>
   );
 }

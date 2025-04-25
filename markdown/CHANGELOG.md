@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Set default map center to Maui with zoom level 9
   - Added real-time user location tracking with marker and accuracy radius
   - Implemented geolocation error handling
+  - Optimized map rendering and performance for smooth panning and zooming
+  - Enhanced marker positioning to stay locked to GPS coordinates
+  - Improved map interaction with hardware-accelerated rendering
 
 - Item Management Planning
   - Defined Firebase collections structure for Items, Categories, and Tags
@@ -114,6 +117,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `ItemForm` to use comprehensive `ALL_TAGS` list from `constants.js`.
 - Restructured ItemForm into logical sections with conditional rendering based on item type
 - Enhanced Image management with proper ordering, preview functionality, and deletion options
+- Updated map configuration to use a lighter style for better performance
+- Modified map boundaries to allow viewing a larger area around Maui
+- Changed zoom behavior to enable standard mousewheel zoom without requiring Ctrl key
+- Optimized marker creation process to update existing markers instead of recreating them
+- Enhanced CSS with hardware acceleration techniques for smoother rendering
 
 ### Fixed
 - Resolved module resolution errors by adding explicit .js extensions to imports
@@ -138,6 +146,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed inconsistency where deals were being saved to 'Items' collection but queried from 'Deals'
   - Added proper dealsCollectionRef initialization
   - Enhanced deal data structure with proper analytics and status fields
+- Fixed map performance issues:
+  - Resolved marker positioning problems where icons would slide during map panning
+  - Fixed jank and stuttering when panning around the map
+  - Removed accuracy circle around user location that was affecting map zoom out
+  - Optimized rendering during map movement to prevent performance degradation
+  - Fixed mousewheel zoom requiring Ctrl key modifier
+  - Resolved map reinitialization issues caused by improper dependency arrays
+  - Added intelligent marker management to prevent unnecessary redraws
+  - Implemented proper state updates to prevent excessive re-rendering during map interaction
 
 ## [0.1.0] - 2024-03-XX
 - Initial project setup and basic structure implementation
@@ -152,3 +169,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Created AdminCheck component for verifying admin status
 - Added token refresh functionality for admin authentication 
+
+## 2024-05-13
+### Fixed
+- **Map Performance:** Significantly improved map performance and user experience
+  - Fixed markers not staying locked to their GPS coordinates during map panning
+  - Removed distracting accuracy circle around user location
+  - Fixed janky/stuttering behavior when panning the map
+  - Enabled standard mousewheel zoom without requiring Ctrl key
+  - Extended zoom out capability to see more of the map area
+### Changed
+- **Map Rendering:** Enhanced map rendering with hardware acceleration
+  - Added CSS optimizations for smoother marker rendering
+  - Implemented more efficient marker management
+  - Changed to a lighter map style for better performance
+  - Added intelligent viewport updates to reduce unnecessary state changes 

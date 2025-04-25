@@ -19,30 +19,74 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase.js'; // ADDED .js extension
+import { generateImageId, createImageObject } from './storageService';
 
 const itemsCollectionRef = collection(db, 'Items');
 const dealsCollectionRef = collection(db, 'Deals');
 
 /**
- * Creates a new item document in Firestore.
- * @param {object} itemData - The data for the new item.
- * @returns {Promise<string>} The ID of the newly created document.
+ * Process item data for storage in Firestore, handling base64 images
+ * @param {object} itemData - The item data to process
+ * @returns {object} - Processed item data ready for storage
+ */
+export const processItemDataForStorage = (itemData) => {
+  const processedData = { ...itemData };
+  
+  // Process main image if it exists
+  if (processedData.imageUrl && processedData.imageUrl.startsWith('data:image')) {
+    console.log('Processing base64 image for item');
+    const imageId = processedData.imageId || generateImageId();
+    processedData.imageId = imageId;
+    processedData.image = createImageObject(processedData.imageUrl, imageId, true);
+  }
+  
+  // Update timestamp
+  processedData.updatedAt = new Date().toISOString();
+  
+  return processedData;
+};
+
+/**
+ * Process deal data for storage in Firestore, handling base64 images
+ * @param {object} dealData - The deal data to process
+ * @returns {object} - Processed deal data ready for storage
+ */
+export const processDealDataForStorage = (dealData) => {
+  const processedData = { ...dealData };
+  
+  // Process main image if it exists
+  if (processedData.imageUrl && processedData.imageUrl.startsWith('data:image')) {
+    console.log('Processing base64 image for deal');
+    const imageId = processedData.imageId || generateImageId();
+    processedData.imageId = imageId;
+    processedData.image = createImageObject(processedData.imageUrl, imageId, true);
+  }
+  
+  // Update timestamp
+  processedData.updatedAt = new Date().toISOString();
+  
+  return processedData;
+};
+
+/**
+ * Create a new item in the Firestore database.
+ * @param {object} itemData - Data for the new item.
+ * @returns {Promise<string>} A promise that resolves with the ID of the created item.
  */
 export const createItem = async (itemData) => {
   try {
-    const docRef = await addDoc(itemsCollectionRef, {
-      ...itemData,
-      status: {
-        ...itemData.status,
-        createdAt: serverTimestamp(),
-        lastUpdated: serverTimestamp(),
-      },
+    const processedData = processItemDataForStorage(itemData);
+    const itemRef = collection(db, 'Items');
+    const docRef = await addDoc(itemRef, {
+      ...processedData,
+      createdAt: new Date().toISOString(),
+      active: true
     });
-    console.log('Document written with ID: ', docRef.id);
+    console.log('Item created with ID: ', docRef.id);
     return docRef.id;
-  } catch (e) {
-    console.error('Error adding document: ', e);
-    throw new Error('Failed to create item');
+  } catch (error) {
+    console.error('Error creating item: ', error);
+    throw error;
   }
 };
 
@@ -166,22 +210,20 @@ export const queryItems = async (options = {}) => {
 };
 
 /**
- * Updates an existing item document in Firestore.
- * @param {string} id - The ID of the item document to update.
- * @param {object} updatedData - An object containing the fields to update.
- * @returns {Promise<void>}
+ * Update an existing item in the Firestore database.
+ * @param {string} itemId - The ID of the item to update.
+ * @param {object} updatedData - The updated data for the item.
+ * @returns {Promise<void>} A promise that resolves when the item is updated.
  */
-export const updateItem = async (id, updatedData) => {
+export const updateItem = async (itemId, updatedData) => {
   try {
-    const itemDoc = doc(db, 'Items', id);
-    await updateDoc(itemDoc, {
-      ...updatedData,
-      'status.lastUpdated': serverTimestamp(), // Ensure lastUpdated is updated
-    });
-    console.log('Document updated with ID: ', id);
-  } catch (e) {
-    console.error('Error updating document: ', e);
-    throw new Error('Failed to update item');
+    const processedData = processItemDataForStorage(updatedData);
+    const itemRef = doc(db, 'items', itemId);
+    await updateDoc(itemRef, processedData);
+    console.log('Item updated: ', itemId);
+  } catch (error) {
+    console.error('Error updating item: ', error);
+    throw error;
   }
 };
 
@@ -209,25 +251,24 @@ export const deleteItem = async (id) => {
 // Deal-related Firebase functions
 
 /**
- * Creates a new deal in Firestore.
- * @param {object} dealData - The data for the new deal.
- * @returns {Promise<object>} Object containing success status and the ID of the newly created document.
+ * Add a new deal to the Firestore database.
+ * @param {object} dealData - Data for the new deal.
+ * @returns {Promise<string>} A promise that resolves with the ID of the created deal.
  */
 export const addDeal = async (dealData) => {
   try {
-    const docRef = await addDoc(dealsCollectionRef, {
-      ...dealData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+    const processedData = processDealDataForStorage(dealData);
+    const dealRef = collection(db, 'deals');
+    const docRef = await addDoc(dealRef, {
+      ...processedData,
+      createdAt: new Date().toISOString(),
+      active: true
     });
-    
-    return {
-      success: true,
-      id: docRef.id
-    };
-  } catch (e) {
-    console.error("Error adding deal: ", e);
-    throw new Error("Failed to add deal");
+    console.log('Deal created with ID: ', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating deal: ', error);
+    throw error;
   }
 };
 
@@ -326,26 +367,20 @@ export const queryDeals = async (options = {}) => {
 };
 
 /**
- * Updates an existing deal document in Firestore.
- * @param {string} id - The ID of the deal document to update.
- * @param {object} updatedData - An object containing the fields to update.
- * @returns {Promise<void>}
+ * Update an existing deal in the Firestore database.
+ * @param {string} dealId - The ID of the deal to update.
+ * @param {object} dealData - The updated data for the deal.
+ * @returns {Promise<void>} A promise that resolves when the deal is updated.
  */
-export const updateDeal = async (id, dealData) => {
+export const updateDeal = async (dealId, dealData) => {
   try {
-    const dealRef = doc(db, "Deals", id);
-    await updateDoc(dealRef, {
-      ...dealData,
-      updatedAt: serverTimestamp()
-    });
-    
-    return {
-      success: true,
-      id
-    };
-  } catch (e) {
-    console.error("Error updating deal: ", e);
-    throw new Error("Failed to update deal");
+    const processedData = processDealDataForStorage(dealData);
+    const dealRef = doc(db, 'deals', dealId);
+    await updateDoc(dealRef, processedData);
+    console.log('Deal updated: ', dealId);
+  } catch (error) {
+    console.error('Error updating deal: ', error);
+    throw error;
   }
 };
 

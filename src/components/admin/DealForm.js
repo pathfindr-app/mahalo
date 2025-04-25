@@ -24,6 +24,7 @@ import draftToHtml from 'draftjs-to-html';
 import htmlToDraft from 'html-to-draftjs';
 import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
 import './DealForm.css';
+import DirectImageUploader from '../common/DirectImageUploader';
 
 /**
  * Component for creating and editing deals
@@ -49,7 +50,8 @@ const DealForm = ({ dealId, onSubmissionSuccess, onCancel }) => {
     },
     status: {
       isActive: true
-    }
+    },
+    image: null
   });
   
   const [isEditing, setIsEditing] = useState(false);
@@ -172,7 +174,8 @@ const DealForm = ({ dealId, onSubmissionSuccess, onCancel }) => {
       },
       status: {
         isActive: true
-      }
+      },
+      image: null
     });
     setDescriptionEditorState(EditorState.createEmpty());
     setTermsEditorState(EditorState.createEmpty());
@@ -268,6 +271,27 @@ const DealForm = ({ dealId, onSubmissionSuccess, onCancel }) => {
     return EditorState.createWithContent(contentState);
   };
 
+  const handleImageUploaded = (base64Data, path) => {
+    console.log("Deal image uploaded successfully - storing base64 data");
+    setFormData(prev => ({
+      ...prev,
+      image: {
+        url: base64Data,
+        path,
+        alt: formData.title || 'Deal image',
+        isBase64: true // Mark as base64 for proper storage/retrieval
+      }
+    }));
+  };
+
+  const handleImageDeleted = () => {
+    console.log("Deal image deleted");
+    setFormData(prev => ({
+      ...prev,
+      image: null
+    }));
+  };
+
   const validateForm = () => {
     const errors = {};
     
@@ -332,8 +356,15 @@ const DealForm = ({ dealId, onSubmissionSuccess, onCancel }) => {
         status: {
           ...formData.status,
           isActive: true
-        }
+        },
+        // Ensure image data is properly formatted - no additional processing needed
+        image: formData.image ? {
+          ...formData.image
+          // Base64 data is already stored in the url field
+        } : null
       };
+      
+      console.log("Submitting deal with" + (formData.image ? " base64 image" : "out image"));
       
       if (isEditing) {
         await updateDeal(dealId, dealData);
@@ -411,6 +442,23 @@ const DealForm = ({ dealId, onSubmissionSuccess, onCancel }) => {
               required
               error={!!validationErrors.title}
               helperText={validationErrors.title}
+            />
+          </Grid>
+          
+          {/* Deal Image */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" gutterBottom>
+              Deal Image
+            </Typography>
+            <DirectImageUploader
+              title="Upload deal image"
+              initialImage={formData.image?.url ? {
+                url: formData.image.url,
+                path: formData.image.path || ''
+              } : null}
+              storagePath={dealId ? `deals/${dealId}/image` : 'deals/temp'}
+              onImageUploaded={handleImageUploaded}
+              onImageDeleted={handleImageDeleted}
             />
           </Grid>
 

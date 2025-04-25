@@ -14,7 +14,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { useAuth } from '../../context/AuthContext.js';
-import { getIdTokenResult } from 'firebase/auth';
+import { auth } from '../../services/firebase.js';
 import ItemList from './ItemList.js';
 import ItemForm from '../items/ItemForm.js';
 import DealList from './DealList.js';
@@ -39,11 +39,15 @@ function AdminDashboard() {
     const checkAdminStatus = async () => {
       setAdminChecking(true);
       try {
-        if (currentUser) {
-          // Get the ID token result to check admin claim
-          const idTokenResult = await getIdTokenResult(currentUser, true);
+        // Get the *real* current user from the auth instance
+        const user = auth.currentUser;
+        if (user) {
+          // Get the ID token result from the actual user object
+          const idTokenResult = await user.getIdTokenResult(true); // Force refresh
+          console.log("Checking admin status in AdminDashboard. Claims:", idTokenResult.claims); // Add log
           setIsAdmin(!!idTokenResult.claims.admin);
         } else {
+          console.log("No user found in AdminDashboard check."); // Add log
           setIsAdmin(false);
         }
       } catch (error) {
@@ -55,6 +59,7 @@ function AdminDashboard() {
     };
 
     checkAdminStatus();
+    // Depend on currentUser from context only to re-trigger the check when login state changes
   }, [currentUser]);
 
   const handleTabChange = (event, newValue) => {
