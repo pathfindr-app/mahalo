@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { 
   Button, 
@@ -21,6 +21,9 @@ import { uploadFile, deleteImage } from '../../services/storageService.js';
 import { auth } from '../../services/firebase.js';
 import './ImageUploader.css';
 
+// Helper to generate a simple random string for IDs
+const generateRandomId = () => Math.random().toString(36).substring(2, 10);
+
 const ImageUploader = ({
   imageUrl,
   storagePath,
@@ -30,13 +33,17 @@ const ImageUploader = ({
   allowMultiple = false,
   images = [],
   buttonLabel = 'Upload Image',
-  acceptedFileTypes = 'image/*'
+  acceptedFileTypes = 'image/*',
+  idSuffix
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Generate a unique ID for this instance
+  const uniqueId = useMemo(() => `image-upload-input-${idSuffix || generateRandomId()}`, [idSuffix]);
 
   const handleFileChange = async (event) => {
     const files = event.target.files;
@@ -227,9 +234,9 @@ const ImageUploader = ({
           onChange={handleFileChange}
           style={{ display: 'none' }}
           multiple={allowMultiple}
-          id="image-upload-input"
+          id={uniqueId}
         />
-        <label htmlFor="image-upload-input">
+        <label htmlFor={uniqueId}>
           <Button
             variant="outlined"
             component="span"
@@ -336,9 +343,15 @@ ImageUploader.propTypes = {
   onImageDeleted: PropTypes.func.isRequired,
   title: PropTypes.string,
   allowMultiple: PropTypes.bool,
-  images: PropTypes.array,
+  images: PropTypes.arrayOf(PropTypes.shape({
+    url: PropTypes.string.isRequired,
+    path: PropTypes.string,
+    alt: PropTypes.string,
+    order: PropTypes.number
+  })),
   buttonLabel: PropTypes.string,
   acceptedFileTypes: PropTypes.string,
+  idSuffix: PropTypes.string
 };
 
 export default ImageUploader; 

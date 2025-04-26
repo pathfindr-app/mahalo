@@ -47,6 +47,25 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
    - Gallery images upload (for carousel)
    - Display order for gallery
 
+## Completed Work / Recent Fixes
+
+- **Implemented Item Listing:** Created `ItemList.js` with search and filter capabilities.
+- **Navigation:** Set up navigation between `AdminDashboard`, `ItemList`, and `ItemForm`.
+- **GPS Input:** Enhanced GPS input using `MapPicker`.
+- **Firebase Setup:** Established basic Firebase connection and tested item creation/update.
+- **Edit Mode:** Implemented edit functionality in `ItemForm` with data pre-population.
+- **Rich Text:** Added rich text editor (`react-draft-wysiwyg`) for detailed descriptions.
+- **Image Uploads:** Created `ImageUploader` component and `storageService.js` for Firebase Storage.
+- **Gallery Order:** Implemented drag-and-drop reordering for gallery images using `@dnd-kit`.
+- **Parking Info:** Added parking details section with coordinate picker.
+- **Presentation:** Included style controls (opacity, blur, color).
+- **Tag Selection:** Added searchable dropdown for tag selection.
+- **Deal Management:** Created `DealForm`, `DealList`, and Firestore services for deals.
+- **Validation & Errors:** Added form validation (coordinates, etc.) and error handling.
+- **Loading/Notifications:** Implemented basic loading states and notifications.
+- **Unmounted State Fix:** Addressed React warnings for `setState` on unmounted components using `isMountedRef`.
+- **Image Uploader ID Conflict:** Fixed a bug where the gallery image uploader triggered the header image uploader. This was caused by duplicate HTML `id` attributes on the file input elements within multiple `ImageUploader` instances. Resolved by adding a unique `idSuffix` prop to `ImageUploader` and passing distinct values ('header', 'gallery') from `ItemForm.js`.
+
 ## Firebase Collections Structure
 
 ### Items Collection (`Items`)

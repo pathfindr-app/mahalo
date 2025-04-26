@@ -479,12 +479,40 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     console.log("Submitting item with base64 images");
 
     try {
+      // --- Verify Admin Claim before Update --- 
+      if (auth.currentUser) {
+          try {
+              const tokenResult = await auth.currentUser.getIdTokenResult(true); // Force refresh
+              console.log("User Claims:", tokenResult.claims);
+              if (!tokenResult.claims.admin) {
+                  console.warn("Admin claim is missing or false!");
+                  // Optional: Set submitError here if needed
+                  // setSubmitError("User is not an admin.");
+                  // setLoading(false);
+                  // return; // Prevent submission if claim is missing
+              }
+          } catch (claimError) {
+              console.error("Error getting user claims:", claimError);
+              setSubmitError("Failed to verify user permissions.");
+              setLoading(false);
+              return;
+          }
+      } else {
+          console.error("No authenticated user found before submit!");
+          setSubmitError("Authentication error.");
+          setLoading(false);
+          return;
+      }
+      // --- End Verify Admin Claim --- 
+
       if (isEditing) {
         console.log(`Updating item ${itemId}`);
+        console.log("Data being sent to updateItem:", JSON.stringify(dataToSubmit, null, 2)); // Log data
         await updateItem(itemId, dataToSubmit);
         console.log('Item updated successfully');
       } else {
          console.log("Creating new item");
+         // For create, we might not need to check claims here if rules allow it
         const newId = await createItem(dataToSubmit);
         console.log('Item created successfully with ID:', newId);
       }
@@ -540,6 +568,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
 
   // Updated handler for Header Image upload using ImageUploader
   const handleHeaderImageUpload = (downloadUrl, storagePath) => {
+    console.log("**** handleHeaderImageUpload CALLED ****"); // Add specific log
     console.log("Header image uploaded to Storage:", downloadUrl, storagePath);
     setFormData(prev => ({
       ...prev,
@@ -570,6 +599,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
 
   // Updated handler for Gallery Image uploads using ImageUploader (allowMultiple=true)
   const handleGalleryImagesUpload = (uploadedImages) => { // Expects an array of {url, path, alt, order}
+    console.log("**** handleGalleryImagesUpload CALLED ****"); // Add specific log
     console.log("Gallery images uploaded to Storage:", uploadedImages);
     setFormData(prev => {
       const newGallery = [
@@ -905,9 +935,10 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                       imageUrl={formData.presentation?.headerImage?.url || null}
                       storagePath={`items/${getStorageId()}/header`}
                       onImageUploaded={handleHeaderImageUpload}
-                      onImageDeleted={handleHeaderImageDelete} // Pass the handler
+                      onImageDeleted={handleHeaderImageDelete}
                       allowMultiple={false}
                       buttonLabel={formData.presentation?.headerImage?.url ? 'Replace Header Image' : 'Upload Header Image'}
+                      idSuffix="header"
                     />
                   </div>
 
@@ -915,12 +946,13 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                   <div className="form-group">
                     <ImageUploader
                       title="Gallery Images"
-                      images={formData.presentation?.gallery || []} // Pass the gallery array
+                      images={formData.presentation?.gallery || []}
                       storagePath={`items/${getStorageId()}/gallery`}
-                      onImageUploaded={handleGalleryImagesUpload} // Handles multiple uploads
-                      onImageDeleted={handleGalleryImageDelete} // Pass the handler
+                      onImageUploaded={handleGalleryImagesUpload}
+                      onImageDeleted={handleGalleryImageDelete}
                       allowMultiple={true}
                       buttonLabel="Add Gallery Images"
+                      idSuffix="gallery"
                     />
                   </div>
                 </div>

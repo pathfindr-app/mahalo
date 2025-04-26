@@ -218,7 +218,7 @@ export const queryItems = async (options = {}) => {
 export const updateItem = async (itemId, updatedData) => {
   try {
     const processedData = processItemDataForStorage(updatedData);
-    const itemRef = doc(db, 'items', itemId);
+    const itemRef = doc(db, 'Items', itemId);
     await updateDoc(itemRef, processedData);
     console.log('Item updated: ', itemId);
   } catch (error) {
