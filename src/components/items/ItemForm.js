@@ -25,9 +25,25 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  IconButton
 } from '@mui/material';
 import ImageUploader from '../common/ImageUploader.js';
+import IconPickerModal from '../common/IconPickerModal.js';
+// Remove the problematic import
+// import * as AllIcons from 'react-icons/all'; 
+
+// Import the specific icon sets you are using in IconPickerModal
+import * as FaIcons from 'react-icons/fa';
+import * as MdIcons from 'react-icons/md';
+// Add other sets here if you added them to the modal (e.g., HiIcons, FiIcons)
+
+// Combine the icons from the imported sets for lookup
+const ICON_COMPONENTS = {
+  ...FaIcons,
+  ...MdIcons,
+  // ... add other sets here
+};
 
 // Rich text editor imports
 import { EditorState, ContentState, convertToRaw } from 'draft-js';
@@ -57,7 +73,6 @@ const tagOptions = ALL_TAGS.map(tag => ({
 function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     type: 'poi',
-    icon: '',
     name: '',
     description: {
       brief: '',
@@ -81,6 +96,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       }
     },
     presentation: {
+      icon: '',
       container: {
         opacity: 100,
         blur: 0,
@@ -113,6 +129,21 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
+  // State for Icon Picker Modal
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+
+  // Helper function to get the icon component by name
+  const getIconComponent = (iconName) => {
+    if (!iconName || typeof iconName !== 'string') return null;
+    // Look up the icon component in our combined object
+    const IconComponent = ICON_COMPONENTS[iconName]; 
+    // Log if the icon isn't found (helps debugging)
+    if (!IconComponent) {
+        console.warn(`Icon component not found for name: ${iconName}. Make sure the corresponding icon set (e.g., react-icons/fa) is imported in ItemForm.js`);
+    }
+    return IconComponent ? <IconComponent size={20} /> : null; // Render with a default size
+  };
+
   useEffect(() => {
     // Set mounted flag to true when component mounts
     isMountedRef.current = true;
@@ -121,7 +152,6 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     setFormData(prevData => ({
       ...prevData, // Keep potentially existing structure
       type: 'poi',
-      icon: '',
       name: '',
       description: { brief: '', detailed: '', bestTime: '', weatherNotes: '' },
       location: { 
@@ -130,6 +160,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       },
       presentation: { 
           ...prevData.presentation, // Keep container, etc.
+          icon: '', // Reset icon here
           headerImage: null, 
           gallery: [] 
       },
@@ -201,7 +232,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                 presentation: {
                     ...formData.presentation,
                      ...(itemData.presentation || {}), // Spread presentation object first
-                     icon: itemData.icon ?? formData.presentation.icon, // Map top-level icon
+                     icon: itemData.presentation?.icon || itemData.icon || '', // Use presentation.icon, fallback to top-level icon if exists, then default
                      container: {
                         ...formData.presentation.container,
                         ...((itemData.presentation && itemData.presentation.container) || {})
@@ -363,6 +394,30 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         }
       }
     }));
+  };
+
+  // Specific handler for coordinate changes (main location or parking)
+  const handleCoordinateChange = (event, isParking = false) => {
+    const { name, value } = event.target; // name should be 'lat' or 'lng'
+    const section = isParking ? 'parking' : 'coordinates';
+    const path = isParking ? ['location', 'parking', 'coordinates'] : ['location', 'coordinates'];
+
+    setFormData(prevData => {
+      // Deep clone the relevant parts to avoid mutation issues
+      const newData = { ...prevData };
+      let currentLevel = newData;
+      for(let i = 0; i < path.length - 1; i++) {
+        currentLevel[path[i]] = { ...currentLevel[path[i]] };
+        currentLevel = currentLevel[path[i]];
+      }
+      // Update the specific lat/lng value
+      currentLevel[path[path.length - 1]] = {
+        ...currentLevel[path[path.length - 1]],
+        [name]: value
+      };
+
+      return newData;
+    });
   };
 
   const validateForm = () => {
@@ -662,6 +717,75 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     setPreviewOpen(false);
   };
 
+  const handleIconSelect = (iconName) => {
+    console.log("Selected Icon Name:", iconName);
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        icon: iconName // Store the icon name string
+      }
+    }));
+    setIsIconPickerOpen(false); // Close modal after selection
+  };
+
+  // Generic handleChange function (ensure it doesn't overwrite nested objects unintentionally)
+  const handleNestedChange = (event, section, field) => {
+    const { name, value, type, checked } = event.target;
+    const val = type === 'checkbox' ? checked : value;
+
+    setFormData(prevData => ({
+      ...prevData,
+      [section]: {
+        ...prevData[section],
+        [field || name]: val // Use field if provided (for specific cases), otherwise use name
+      }
+    }));
+  };
+
+  // Specific handler for container style changes
+  const handleContainerStyleChange = (event) => {
+    const { name, value } = event.target;
+    let processedValue = value;
+    if (name === 'opacity' || name === 'blur') {
+      processedValue = parseInt(value, 10); // Ensure numbers are stored as numbers
+    }
+    
+    setFormData(prevData => ({
+      ...prevData,
+      presentation: {
+        ...prevData.presentation,
+        container: {
+          ...prevData.presentation.container,
+          [name]: processedValue
+        }
+      }
+    }));
+  };
+  
+  // Specific handler for Parking sub-fields
+  const handleParkingChange = (event) => {
+     const { name, value } = event.target;
+     setFormData(prevData => ({
+         ...prevData,
+         location: {
+             ...prevData.location,
+             parking: {
+                 ...prevData.location.parking,
+                 [name]: value
+             }
+         }
+     }));
+  };
+  
+  // Specific handler for Tag selection
+  const handleTagChange = (selectedOptions) => {
+    setFormData(prevData => ({
+      ...prevData,
+      tags: selectedOptions ? selectedOptions.map(option => option.value) : []
+    }));
+  };
+
   if (loading && isEditing && !fetchError) {
     return <div className="loading-indicator">Loading item data...</div>;
   }
@@ -955,6 +1079,28 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                       idSuffix="gallery"
                     />
                   </div>
+
+                  {/* Icon Selection Button (Replaces the old input) */}
+                  <div className="form-group">
+                      <label>Icon *</label> {/* Add label for clarity */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                          <Button 
+                              variant="outlined" 
+                              onClick={() => setIsIconPickerOpen(true)}
+                              startIcon={getIconComponent(formData.presentation.icon) || undefined} // Show selected icon in button
+                              fullWidth // Make button take full width like other inputs
+                              sx={{ justifyContent: 'flex-start' }} // Align content left
+                          >
+                              {formData.presentation.icon ? 'Change Icon' : 'Select Icon'}
+                          </Button>
+                          {/* Optional: Display selected icon name next to button */}
+                          {/* {formData.presentation.icon && (
+                              <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>({formData.presentation.icon})</Typography>
+                          )} */}
+                      </Box>
+                      {/* Add validation error display if needed */} 
+                      {validationErrors.icon && <p className="error-message">{validationErrors.icon}</p>} 
+                  </div>
                 </div>
               </div>
             </div>
@@ -1007,6 +1153,13 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Icon Picker Modal */}
+      <IconPickerModal
+        open={isIconPickerOpen}
+        onClose={() => setIsIconPickerOpen(false)}
+        onIconSelect={handleIconSelect}
+      />
     </Dialog>
   );
 }

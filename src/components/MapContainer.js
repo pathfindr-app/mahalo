@@ -1,9 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactDOM from 'react-dom'; // Import ReactDOM
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { queryItems } from '../services/firestoreService.js';
 import ItemDetailModal from './modals/ItemDetailModal.js';
 import '../styles/MapContainer.css'; // Ensure the CSS is imported
+
+// Import the specific icon sets used in the form/data
+import * as FaIcons from 'react-icons/fa';
+import * as MdIcons from 'react-icons/md';
+// Add other sets if needed
+
+// Combine the icons for lookup
+const ICON_COMPONENTS = {
+  ...FaIcons,
+  ...MdIcons,
+  // ... add other sets here
+};
+
+// Helper function to get the icon component by name (similar to ItemForm)
+const getIconComponent = (iconName, size = 18) => { // Added default size
+  if (!iconName || typeof iconName !== 'string') return null;
+  const IconComponent = ICON_COMPONENTS[iconName]; 
+  if (!IconComponent) {
+      console.warn(`Map Icon component not found for name: ${iconName}. Make sure the corresponding icon set is imported in MapContainer.js`);
+      return null;
+  }
+  // Return the component type itself, not the rendered element yet
+  return IconComponent; 
+};
 
 // Initialize Mapbox token
 mapboxgl.accessToken = 'pk.eyJ1IjoicGF0aGZpbmRyIiwiYSI6ImNtNXpnaWtxZDAyZGsya29vZno2eHZmdHkifQ.7y3kEVzLKOxlqAFAbdUktQ';
@@ -15,13 +40,13 @@ const MAUI_CENTER = {
   zoom: 9
 };
 
-// POI Types with icons/colors
+// POI Types with colors (keep fallback emojis just in case)
 const TYPE_STYLES = {
-  'vendor': { color: '#4CAF50', icon: '🛒' },
-  'poi': { color: '#2196F3', icon: '🏠' },
-  'beach': { color: '#FFC107', icon: '🏖️' },
-  'restaurant': { color: '#FF5722', icon: '🍴' },
-  'activity': { color: '#9C27B0', icon: '🎯' }
+  'vendor': { color: '#4CAF50', fallbackIcon: '🛒' }, 
+  'poi': { color: '#2196F3', fallbackIcon: '🏠' }, 
+  'beach': { color: '#FFC107', fallbackIcon: '🏖️' }, 
+  'restaurant': { color: '#FF5722', fallbackIcon: '🍴' }, 
+  'activity': { color: '#9C27B0', fallbackIcon: '🎯' } 
 };
 
 const MapContainer = () => {
@@ -123,13 +148,19 @@ const MapContainer = () => {
         iconSpan.style.alignItems = 'center';
         iconSpan.style.justifyContent = 'center';
         
-        // Use the normalized icon from item data
-        if (item.presentation && item.presentation.icon) {
-          console.log(`Using icon from item: "${item.presentation.icon}" for ${item.name}`);
-          iconSpan.textContent = item.presentation.icon;
+        // Get the React Icon component based on the stored name
+        const IconComponent = getIconComponent(item.presentation?.icon);
+        
+        if (IconComponent) {
+          console.log(`Rendering React Icon: ${item.presentation.icon} for ${item.name}`);
+          // Use ReactDOM.render to put the React component into the DOM element
+          // Wrap IconComponent in React.createElement or JSX syntax if possible within this context
+          // Note: Directly using JSX here might require build tool configuration
+          // Using React.createElement is safer if JSX isn't transpiled here.
+          ReactDOM.render(React.createElement(IconComponent, { size: 18, color: 'white' }), iconSpan); 
         } else {
-          // Fallback to our emoji icons
-          const fallbackIcon = TYPE_STYLES[item.type]?.icon || '📍';
+          // Fallback to text/emoji if icon name is invalid or component not found
+          const fallbackIcon = TYPE_STYLES[item.type]?.fallbackIcon || '📍';
           console.log(`Using fallback icon: "${fallbackIcon}" for ${item.name}`);
           iconSpan.textContent = fallbackIcon;
         }
