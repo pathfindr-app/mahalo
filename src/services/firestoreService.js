@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase.js'; // ADDED .js extension
 import { generateImageId, createImageObject } from './storageService';
+import { getAuth } from 'firebase/auth'; // <<< Import getAuth
 
 const itemsCollectionRef = collection(db, 'Items');
 const dealsCollectionRef = collection(db, 'Deals');
@@ -374,8 +375,19 @@ export const queryDeals = async (options = {}) => {
  */
 export const updateDeal = async (dealId, dealData) => {
   try {
+    // <<< Add claims logging >>>
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (user) {
+      const idTokenResult = await user.getIdTokenResult(true); // Force refresh token
+      console.log('User Claims before updating deal:', idTokenResult.claims);
+    } else {
+      console.log('No user logged in before updating deal.');
+    }
+    // <<< End claims logging >>>
+
     const processedData = processDealDataForStorage(dealData);
-    const dealRef = doc(db, 'deals', dealId);
+    const dealRef = doc(db, 'Deals', dealId); // <<< CORRECTED collection name to 'Deals' >>>
     await updateDoc(dealRef, processedData);
     console.log('Deal updated: ', dealId);
   } catch (error) {

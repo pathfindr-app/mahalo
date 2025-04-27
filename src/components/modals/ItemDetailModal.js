@@ -1,92 +1,239 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  Box, 
-  Typography, 
-  Button, 
-  IconButton, 
-  Tabs,
-  Tab,
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Modal,
+  Box,
+  Typography,
+  IconButton,
   Chip,
   CircularProgress,
-  Divider
+  Divider,
+  Link,
+  Grid
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import LocalParkingIcon from '@mui/icons-material/LocalParking';
-import InfoIcon from '@mui/icons-material/Info';
-import ImageIcon from '@mui/icons-material/Image';
-import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { getItem } from '../../services/firestoreService';
 import { queryDeals } from '../../services/firestoreService';
 import './ItemDetailModal.css';
 
-function TabPanel({ children, value, index, ...other }) {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`tabpanel-${index}`}
-      aria-labelledby={`tab-${index}`}
-      {...other}
-      className="item-detail-tabpanel"
-    >
-      {value === index && (
-        <Box sx={{ p: 2 }}>
-          {children}
+const DetailBlock = ({ title, children, className = "" }) => (
+    <Box className={`content-block ${className}`}>
+        <Box className="content-block-inner">
+            <Typography variant="h6" gutterBottom>{title}</Typography>
+            <Divider sx={{ mb: 1 }} />
+            {children}
         </Box>
-      )}
-    </div>
-  );
-}
+    </Box>
+);
+
+const DescriptionBlock = ({ item }) => (
+    <DetailBlock title="Details">
+        {item.description?.detailed ? (
+            <div
+                className="item-detailed-description"
+                dangerouslySetInnerHTML={{ __html: item.description.detailed }}
+            />
+        ) : <Typography variant="body2" color="textSecondary">No detailed description available.</Typography>}
+    </DetailBlock>
+);
+
+const GalleryBlock = ({ item }) => (
+    <DetailBlock title="Gallery">
+        <Box className="item-gallery">
+            <div className="gallery-grid">
+                {item.presentation.gallery.map((image, index) => (
+                    <div className="gallery-item" key={index}>
+                        <img src={image.url} alt={image.alt || `Gallery image ${index + 1}`} />
+                    </div>
+                ))}
+            </div>
+        </Box>
+    </DetailBlock>
+);
+
+const LocationBlock = ({ item, getDirectionsUrl }) => (
+    <DetailBlock title="Location">
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <LocationOnIcon sx={{ mr: 1 }} fontSize="small" />
+            <Typography variant="body2">
+                Lat: {item.location.coordinates.lat.toFixed(5)}, Lng: {item.location.coordinates.lng.toFixed(5)}
+            </Typography>
+        </Box>
+        <Link
+            href={getDirectionsUrl(item.location.coordinates.lat, item.location.coordinates.lng)}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="body2"
+        >
+            Get Directions
+        </Link>
+    </DetailBlock>
+);
+
+const ParkingBlock = ({ item, getDirectionsUrl }) => (
+    <DetailBlock title="Parking">
+        {item.location?.parking?.availability && item.location.parking.availability !== 'none' && (
+            <Chip
+                icon={<LocalParkingIcon />}
+                label={item.location.parking.availability.charAt(0).toUpperCase() + item.location.parking.availability.slice(1)}
+                size="small"
+                color={item.location.parking.availability === 'ample' ? 'success' : item.location.parking.availability === 'limited' ? 'warning' : 'default'}
+                sx={{ mb: 1 }}
+            />
+        )}
+        {item.location?.parking?.description && (
+            <Typography variant="body2" sx={{ mb: 1 }}>{item.location.parking.description}</Typography>
+        )}
+        {item.location?.parking?.cost && (
+            <Typography variant="body2" sx={{ mb: 1 }}>Cost: {item.location.parking.cost}</Typography>
+        )}
+        {item.location?.parking?.coordinates?.lat && (
+            <Link
+                href={getDirectionsUrl(item.location.parking.coordinates.lat, item.location.parking.coordinates.lng)}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="body2"
+            >
+                Directions to Parking
+            </Link>
+        )}
+        {item.location?.parking?.availability === 'none' && !item.location?.parking?.description && !item.location?.parking?.cost && (
+           <Typography variant="body2" color="textSecondary">No specific parking information available.</Typography>
+        )}
+    </DetailBlock>
+);
+
+// Helper function to format dates - Now handles Firestore Timestamps
+const formatDate = (timestampOrDateString) => {
+  if (!timestampOrDateString) return 'N/A';
+  try {
+    let date;
+    // Check if it looks like a Firestore Timestamp object
+    if (timestampOrDateString && typeof timestampOrDateString.seconds === 'number' && typeof timestampOrDateString.nanoseconds === 'number') {
+      date = timestampOrDateString.toDate(); // Convert Firestore Timestamp to JS Date
+    } else {
+      date = new Date(timestampOrDateString); // Assume it's a string or already a Date
+    }
+
+    if (isNaN(date.getTime())) { // Check if date is invalid
+        return 'Invalid Date';
+    }
+
+    // Adjust options as needed
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (e) {
+    console.error("Error formatting date:", timestampOrDateString, e);
+    return 'Error'; // Return generic error on failure
+  }
+};
+
+const DealsBlock = ({ deals }) => {
+    return (
+        <DetailBlock title="Current Deals">
+            <Box className="item-deals">
+                {deals.length > 0 ? deals.map((deal) => {
+                    return (
+                        <Box key={deal.id} className="deal-item" sx={{ mb: 2, pb: 1, borderBottom: '1px solid #eee' }}>
+                            <Typography variant="body1" fontWeight="bold" gutterBottom>{deal.title}</Typography>
+                            <Typography
+                                variant="body2"
+                                component="div"
+                                dangerouslySetInnerHTML={{ __html: deal.description }}
+                                sx={{ mb: 1 }}
+                            />
+                            {(deal.validity?.startDate || deal.validity?.endDate) && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                    <AccessTimeIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                                    <Typography variant="caption" color="textSecondary">
+                                        Valid: {formatDate(deal.validity?.startDate)} - {formatDate(deal.validity?.endDate)}
+                                    </Typography>
+                                </Box>
+                            )}
+                            {(typeof deal.analytics?.currentlyClaimed !== 'undefined' && deal.limits?.maxClaims) && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                    <ConfirmationNumberIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />
+                                    <Typography variant="caption" color="textSecondary">
+                                        Claims: {deal.analytics?.currentlyClaimed} / {deal.limits?.maxClaims}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Box>
+                    );
+                }) : (
+                    <Typography variant="body2" color="textSecondary">No active deals available.</Typography>
+                )}
+            </Box>
+        </DetailBlock>
+    );
+};
+
+const TagsBlock = ({ item }) => (
+     <DetailBlock title="Tags">
+         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+             {item.tags.map((tag, index) => (
+                 <Chip key={index} label={tag} size="small" />
+             ))}
+         </Box>
+     </DetailBlock>
+);
+
+const BestTimeBlock = ({ item }) => (
+     <DetailBlock title="Best Time to Visit">
+         <Typography variant="body2">{item.description.bestTime}</Typography>
+     </DetailBlock>
+);
+
+const WeatherNotesBlock = ({ item }) => (
+     <DetailBlock title="Weather Notes">
+         <Typography variant="body2">{item.description.weatherNotes}</Typography>
+     </DetailBlock>
+);
 
 const ItemDetailModal = ({ isOpen, onClose, itemId }) => {
   const [item, setItem] = useState(null);
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tabValue, setTabValue] = useState(0);
-  
-  // Fetch item data when modal opens and itemId changes
+
   useEffect(() => {
     if (!isOpen || !itemId) return;
-    
+
     const fetchItemData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const itemData = await getItem(itemId);
         setItem(itemData);
-        
-        // If this is a vendor, fetch its deals
+
         if (itemData && itemData.type === 'vendor') {
           const dealsData = await queryDeals({ itemId: itemId, activeOnly: true });
           setDeals(dealsData);
+        } else {
+          setDeals([]);
         }
-        
+
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching item data:', err);
-        setError('Failed to load item details. Please try again.');
+        console.error('Error fetching item data or deals:', err);
+        setError('Failed to load item details or deals. Please try again.');
         setLoading(false);
       }
     };
-    
+
     fetchItemData();
   }, [isOpen, itemId]);
-  
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-  
+
   const modalStyle = {
     position: 'absolute',
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: { xs: '95%', sm: '80%', md: '70%' },
-    maxWidth: '900px',
+    width: { xs: '95%', sm: '85%', md: '75%' },
+    maxWidth: '1000px',
     maxHeight: '90vh',
     bgcolor: 'background.paper',
     boxShadow: 24,
@@ -96,280 +243,116 @@ const ItemDetailModal = ({ isOpen, onClose, itemId }) => {
     display: 'flex',
     flexDirection: 'column'
   };
-  
-  // Helper function to create Google Maps directions URL
+
   const getDirectionsUrl = (lat, lng) => {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}><CircularProgress /></Box>;
+    }
+    if (error) {
+      return <Typography color="error" sx={{ p: 3 }}>{error}</Typography>;
+    }
+    if (!item) {
+      return <Typography sx={{ p: 3 }}>No item data found.</Typography>;
+    }
+
+    const showDescription = !!item.description?.detailed;
+    const showGallery = item.presentation?.gallery?.length > 0;
+    const showLocation = !!item.location?.coordinates;
+    const showParking = item.location?.parking?.availability || item.location?.parking?.description || item.location?.parking?.cost;
+    const showDeals = item.type === 'vendor' && deals.length > 0;
+    const showTags = item.tags && item.tags.length > 0;
+    const showBestTime = !!item.description?.bestTime;
+    const showWeatherNotes = !!item.description?.weatherNotes;
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+             <Box className="item-detail-header">
+                {item.presentation?.headerImage?.url && (
+                    <Box
+                        className="item-detail-header-image"
+                        sx={{ backgroundImage: `url(${item.presentation.headerImage.url})` }}
+                    />
+                )}
+                <Box className="item-detail-header-content">
+                    <Typography variant="h5" component="h2" className="item-title">
+                        {item.name}
+                    </Typography>
+                    {item.description?.brief && (
+                        <Typography variant="body1" className="item-brief">
+                            {item.description.brief}
+                        </Typography>
+                    )}
+                </Box>
+                <IconButton onClick={onClose} className="close-button" size="small">
+                    <CloseIcon />
+                </IconButton>
+             </Box>
+
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, backgroundColor: '#f4f4f4' }}>
+                 <Grid container spacing={2}>
+                    {showDescription && (
+                        <Grid item xs={12} md={showGallery ? 7 : 12}>
+                            <DescriptionBlock item={item} />
+                        </Grid>
+                    )}
+                     {showGallery && (
+                        <Grid item xs={12} md={showDescription ? 5 : 12}>
+                            <GalleryBlock item={item} />
+                        </Grid>
+                    )}
+
+                    {showLocation && (
+                        <Grid item xs={12} sm={6} md={4}>
+                            <LocationBlock item={item} getDirectionsUrl={getDirectionsUrl} />
+                        </Grid>
+                    )}
+                    {showParking && (
+                         <Grid item xs={12} sm={6} md={4}>
+                            <ParkingBlock item={item} getDirectionsUrl={getDirectionsUrl}/>
+                         </Grid>
+                    )}
+                    {showDeals && (
+                        <Grid item xs={12} sm={6} md={4}>
+                            <DealsBlock deals={deals} />
+                        </Grid>
+                    )}
+
+                     {showBestTime && (
+                        <Grid item xs={12} sm={6}>
+                            <BestTimeBlock item={item} />
+                        </Grid>
+                     )}
+                     {showWeatherNotes && (
+                        <Grid item xs={12} sm={6}>
+                            <WeatherNotesBlock item={item} />
+                        </Grid>
+                     )}
+
+                    {showTags && (
+                        <Grid item xs={12}>
+                            <TagsBlock item={item} />
+                        </Grid>
+                    )}
+
+                 </Grid>
+             </Box>
+        </Box>
+    );
   };
 
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
-      aria-labelledby="item-detail-modal-title"
+      aria-labelledby="item-detail-title"
+      aria-describedby="item-detail-description"
     >
       <Box sx={modalStyle}>
-        {/* Header with background image */}
-        <Box className="item-detail-header">
-          {item?.presentation?.headerImage?.url && (
-            <div 
-              className="item-detail-header-image"
-              style={{ backgroundImage: `url(${item.presentation.headerImage.url})` }}
-            />
-          )}
-          <Box className="item-detail-header-content">
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Typography id="item-detail-modal-title" variant="h5" component="h2" className="item-title">
-                {loading ? 'Loading...' : item?.name || 'Item Details'}
-                {item?.type && (
-                  <Chip 
-                    label={item.type.toUpperCase()} 
-                    size="small" 
-                    color={item.type === 'vendor' ? 'primary' : 'secondary'} 
-                    sx={{ ml: 1 }}
-                  />
-                )}
-              </Typography>
-              <IconButton 
-                aria-label="close" 
-                onClick={onClose} 
-                sx={{ color: 'white' }}
-                className="close-button"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            {item?.description?.brief && (
-              <Typography variant="subtitle1" className="item-brief">
-                {item.description.brief}
-              </Typography>
-            )}
-          </Box>
-        </Box>
-        
-        {/* Loading state */}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-        
-        {/* Error state */}
-        {error && (
-          <Box sx={{ p: 2 }}>
-            <Typography color="error">{error}</Typography>
-            <Button onClick={onClose} sx={{ mt: 2 }}>Close</Button>
-          </Box>
-        )}
-        
-        {/* Content */}
-        {!loading && !error && item && (
-          <>
-            {/* Tabs */}
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs 
-                value={tabValue} 
-                onChange={handleTabChange} 
-                aria-label="item detail tabs"
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                <Tab icon={<InfoIcon />} label="Details" />
-                {item.presentation?.gallery?.length > 0 && (
-                  <Tab icon={<ImageIcon />} label="Gallery" />
-                )}
-                <Tab icon={<LocationOnIcon />} label="Location" />
-                {item.type === 'vendor' && deals.length > 0 && (
-                  <Tab icon={<LocalOfferIcon />} label="Deals" />
-                )}
-              </Tabs>
-            </Box>
-            
-            {/* Details Tab */}
-            <TabPanel value={tabValue} index={0}>
-              <Box className="item-detail-content">
-                {item.description?.detailed && (
-                  <div 
-                    className="item-detailed-description"
-                    dangerouslySetInnerHTML={{ __html: item.description.detailed }}
-                  />
-                )}
-                
-                {item.tags && item.tags.length > 0 && (
-                  <Box className="item-tags" sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2">Tags:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                      {item.tags.map(tag => (
-                        <Chip 
-                          key={tag} 
-                          label={tag.replace(/-/g, ' ')} 
-                          size="small" 
-                          variant="outlined"
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-                )}
-                
-                {item.description?.bestTime && (
-                  <Box className="item-best-time" sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2">Best Time to Visit:</Typography>
-                    <Typography variant="body2">{item.description.bestTime}</Typography>
-                  </Box>
-                )}
-                
-                {item.description?.weatherNotes && (
-                  <Box className="item-weather-notes" sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2">Weather Considerations:</Typography>
-                    <Typography variant="body2">{item.description.weatherNotes}</Typography>
-                  </Box>
-                )}
-              </Box>
-            </TabPanel>
-            
-            {/* Gallery Tab */}
-            {item.presentation?.gallery?.length > 0 && (
-              <TabPanel value={tabValue} index={1}>
-                <Box className="item-gallery">
-                  <div className="gallery-grid">
-                    {item.presentation.gallery.map((image, index) => (
-                      <div className="gallery-item" key={index}>
-                        <img src={image.url} alt={image.alt || `Gallery image ${index + 1}`} />
-                      </div>
-                    ))}
-                  </div>
-                </Box>
-              </TabPanel>
-            )}
-            
-            {/* Location Tab */}
-            <TabPanel value={tabValue} index={2}>
-              <Box className="item-location">
-                {item.location?.coordinates && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2">
-                      <LocationOnIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                      Coordinates
-                    </Typography>
-                    <Typography variant="body2">
-                      Latitude: {item.location.coordinates.lat}, Longitude: {item.location.coordinates.lng}
-                    </Typography>
-                    <Button 
-                      variant="outlined" 
-                      size="small" 
-                      sx={{ mt: 1 }}
-                      component="a"
-                      href={getDirectionsUrl(item.location.coordinates.lat, item.location.coordinates.lng)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Get Directions
-                    </Button>
-                  </Box>
-                )}
-                
-                {item.location?.parking?.availability && item.location.parking.availability !== 'none' && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2">
-                      <LocalParkingIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                      Parking Information
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Availability:</strong> {item.location.parking.availability.charAt(0).toUpperCase() + item.location.parking.availability.slice(1)}
-                    </Typography>
-                    
-                    {item.location.parking.description && (
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        <strong>Description:</strong> {item.location.parking.description}
-                      </Typography>
-                    )}
-                    
-                    {item.location.parking.cost && (
-                      <Typography variant="body2" sx={{ mt: 1 }}>
-                        <strong>Cost:</strong> {item.location.parking.cost}
-                      </Typography>
-                    )}
-                    
-                    {item.location.parking.coordinates?.lat && item.location.parking.coordinates?.lng && (
-                      <>
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          <strong>Parking Coordinates:</strong> {item.location.parking.coordinates.lat}, {item.location.parking.coordinates.lng}
-                        </Typography>
-                        <Button 
-                          variant="outlined" 
-                          size="small" 
-                          sx={{ mt: 1 }}
-                          component="a"
-                          href={getDirectionsUrl(item.location.parking.coordinates.lat, item.location.parking.coordinates.lng)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Get Directions to Parking
-                        </Button>
-                      </>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            </TabPanel>
-            
-            {/* Deals Tab */}
-            {item.type === 'vendor' && deals.length > 0 && (
-              <TabPanel value={tabValue} index={item.presentation?.gallery?.length > 0 ? 3 : 2}>
-                <Box className="item-deals">
-                  <Typography variant="h6" sx={{ mb: 2 }}>Available Deals</Typography>
-                  
-                  {deals.map((deal, index) => (
-                    <Box key={deal.id} className="deal-item" sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" className="deal-title">
-                        {deal.title}
-                      </Typography>
-                      
-                      {deal.description && (
-                        <div 
-                          className="deal-description"
-                          dangerouslySetInnerHTML={{ __html: deal.description }}
-                        />
-                      )}
-                      
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                        <Chip 
-                          label={`${deal.analytics?.currentlyClaimed || 0}/${deal.limits?.maxClaims || 0} claimed`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                        
-                        {deal.validity?.startDate && deal.validity?.endDate && (
-                          <Typography variant="caption">
-                            Valid: {new Date(deal.validity.startDate.seconds * 1000).toLocaleDateString()} 
-                            {' - '}
-                            {new Date(deal.validity.endDate.seconds * 1000).toLocaleDateString()}
-                          </Typography>
-                        )}
-                      </Box>
-                      
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
-                        size="small" 
-                        sx={{ mt: 2 }}
-                        disabled={
-                          (deal.analytics?.currentlyClaimed >= deal.limits?.maxClaims) ||
-                          (new Date() > new Date(deal.validity?.endDate?.seconds * 1000))
-                        }
-                      >
-                        Claim Deal
-                      </Button>
-                      
-                      {index < deals.length - 1 && <Divider sx={{ mt: 2 }} />}
-                    </Box>
-                  ))}
-                </Box>
-              </TabPanel>
-            )}
-          </>
-        )}
+         {renderContent()}
       </Box>
     </Modal>
   );

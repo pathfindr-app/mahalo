@@ -5,6 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { queryItems } from '../services/firestoreService.js';
 import ItemDetailModal from './modals/ItemDetailModal.js';
 import '../styles/MapContainer.css'; // Ensure the CSS is imported
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 // Import the specific icon sets used in the form/data
 import * as FaIcons from 'react-icons/fa';
@@ -62,6 +63,11 @@ const MapContainer = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const markers = useRef({});
   const moveEndTimeout = useRef(null); // Add a ref for the timeout
+
+  // Get user authentication status
+  const { currentUser } = useAuth();
+  // Determine admin status (adjust property name if needed, e.g., currentUser.claims.admin)
+  const isAdmin = currentUser?.isAdmin || false;
 
   // Function to create item markers on the map
   const createItemMarkers = () => {
@@ -177,12 +183,13 @@ const MapContainer = () => {
         `;
         
         // Create and add the marker
+        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML);
         const marker = new mapboxgl.Marker({
           element: el,
           anchor: 'center'  // Ensures marker stays centered at coordinates
         })
           .setLngLat([lng, lat])
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML))
+          .setPopup(popup)
           .addTo(map.current);
         
         // Log the marker position for debugging
@@ -191,6 +198,7 @@ const MapContainer = () => {
         // Add click event to marker element
         el.addEventListener('click', (e) => {
           e.stopPropagation(); // Prevent triggering map click
+          console.log(`Marker clicked: ${item.name} (ID: ${item.id})`); // Log click
           setSelectedItem(item.id);
           setIsModalOpen(true);
         });
@@ -531,6 +539,8 @@ const MapContainer = () => {
   // Handle modal close
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setSelectedItem(null);
+    console.log('Modal closed');
   };
 
   if (error) {
@@ -576,6 +586,7 @@ const MapContainer = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         itemId={selectedItem}
+        isAdmin={isAdmin}
       />
     </div>
   );

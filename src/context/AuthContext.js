@@ -29,7 +29,9 @@ export function AuthProvider({ children }) {
         try {
           const idTokenResult = await user.getIdTokenResult(true);
           console.log("User claims:", idTokenResult.claims);
-          if (idTokenResult.claims.admin === true) {
+          const isAdmin = idTokenResult.claims.admin === true;
+
+          if (isAdmin) {
             console.log("User IS an admin.");
           } else {
             console.log("User is NOT an admin.");
@@ -40,6 +42,7 @@ export function AuthProvider({ children }) {
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
+            isAdmin: isAdmin
           };
           setCurrentUser(userData);
           setError(null);

@@ -124,6 +124,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CSS with hardware acceleration techniques for smoother rendering
 
 ### Fixed
+- **Deal Display in Modal:** Fixed `ItemDetailModal` not displaying deal validity dates and claim counts.
+  - Updated `formatDate` helper to correctly handle Firestore Timestamp objects.
+  - Corrected field access in `DealsBlock` to use `validity.startDate`, `validity.endDate`, `analytics.currentlyClaimed`, and `limits.maxClaims` based on actual data structure.
 - Resolved module resolution errors by adding explicit .js extensions to imports
 - Fixed routing configuration in App.js
 - Addressed map initialization race conditions

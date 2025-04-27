@@ -66,6 +66,16 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 - **Unmounted State Fix:** Addressed React warnings for `setState` on unmounted components using `isMountedRef`.
 - **Image Uploader ID Conflict:** Fixed a bug where the gallery image uploader triggered the header image uploader. This was caused by duplicate HTML `id` attributes on the file input elements within multiple `ImageUploader` instances. Resolved by adding a unique `idSuffix` prop to `ImageUploader` and passing distinct values ('header', 'gallery') from `ItemForm.js`.
 - **React Icons Integration:** Replaced text/emoji icon input in `ItemForm` with a modal (`IconPickerModal`) allowing selection from `react-icons`. Updated `MapContainer` to render the selected React Icon component as the map marker instead of the icon name string. Fixed `react-icons/all` import issue.
+- **Designable Item Detail Modal (Phase 1):**
+  - Integrated `react-grid-layout` into `ItemDetailModal.js`.
+  - Added "Design Mode" toggle for admins, allowing dragging and resizing of content blocks (Details, Gallery, Location, Parking, Deals, Tags, etc.).
+  - Layout configuration is saved to Firestore under `item.presentation.modalLayout`.
+  - Modal now loads saved layouts or uses a default layout.
+  - Integrated modal opening on marker click in `MapContainer.js`.
+  - Fixed admin status detection in `AuthContext.js` to correctly show design controls.
+  - Added basic styling and enabled vertical compaction for better usability.
+  - Created `markdown/DESIGNING_MODALS.md` for detailed implementation plan and progress.
+  - **Fixed Deal Display:** Resolved issues in `ItemDetailModal` preventing deal validity dates and claim counts from displaying correctly by handling Firestore Timestamps and using correct field names (`validity.startDate`, `validity.endDate`, `analytics.currentlyClaimed`, `limits.maxClaims`).
 
 ## Firebase Collections Structure
 
@@ -113,7 +123,8 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
         alt: string,
         order: number
       }
-    ]
+    ],
+    modalLayout: Object | null // Added for designable modal layout
   },
   tags: [String],          // Extensive predefined list for filtering/search (see utils/constants.js)
   status: {
@@ -323,13 +334,19 @@ service cloud.firestore {
     - [X] Allow zooming out further to see more of the map area
     - [X] Implement custom markers based on item type *(Now using React Icons)*
     - [ ] Implement marker clustering for areas with many items
-    - [ ] Create modal component for displaying item details when marker is clicked
-    - [ ] Display item details in modal (description, images, location info)
-    - [ ] Show associated deals in modal for vendor type items
+    - [✓] Create modal component for displaying item details when marker is clicked *(ItemDetailModal created)*
+    - [✓] Display item details in modal (description, images, location info) *(Basic display implemented)*
+    - [X] Show associated deals in modal for vendor type items *(Deals, including dates and claims, are now displayed)*
     - [ ] Implement deal claiming functionality for users
 21. Implement remaining Phase 4 (Analytics & Cloud Functions) tasks.
 22. Address remaining Phase 5 (UI/UX Refinement) tasks (Autosave, Preview Mode).
-23. Address remaining Phase 6 (Map Integration) tasks (Clustering, Modal Details).
+23. Address remaining Phase 6 (Map Integration) tasks (Clustering, Modal Details - Deals/Claiming).
+24. **Refine Designable Modal:**
+    - Improve save layout user feedback (Snackbar/Toast).
+    - Refine default layout values in `ItemDetailModal.js`.
+    - Enhance CSS for a more polished appearance.
+    - Add Firestore security rules for `presentation.modalLayout`.
+    - Conduct thorough testing across different screen sizes.
 
 ## Phase 6: Map Integration
 1. [✓] Create MapView component (`MapContainer.js`)
