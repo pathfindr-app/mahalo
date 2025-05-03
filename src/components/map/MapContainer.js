@@ -23,6 +23,55 @@ const MapContainer = () => {
 
     const { currentUser } = useAuth(); // Get user info if needed for features
 
+    // Convert userCoordinates to the format expected by MapSearchBar
+    const userLocationForMap = userCoordinates ? {
+        lat: userCoordinates.latitude,
+        lng: userCoordinates.longitude
+    } : null;
+
+    // Load items from Firestore when component mounts
+    useEffect(() => {
+        const loadItems = async () => {
+            try {
+                console.log('Fetching items from Firestore...');
+                const fetchedItems = await queryItems();
+                console.log('Items fetched successfully, count:', fetchedItems?.length);
+                console.log('Sample item:', fetchedItems?.[0]);
+                setItems(fetchedItems || []); // Ensure we set an empty array if fetchedItems is null/undefined
+            } catch (err) {
+                console.error('Error fetching items:', err);
+                setError('Failed to load items');
+            }
+        };
+
+        loadItems();
+    }, []);
+
+    // Get user's current location
+    useEffect(() => {
+        const getUserLocation = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        console.log('User location obtained:', latitude, longitude);
+                        setUserCoordinates({
+                            latitude,
+                            longitude
+                        });
+                    },
+                    (error) => {
+                        console.error('Error getting user location:', error);
+                    }
+                );
+            } else {
+                console.error('Geolocation is not supported by this browser.');
+            }
+        };
+
+        getUserLocation();
+    }, []);
+
     const handleSearchResultSelect = useCallback((item) => {
         console.log('Navigating to selected item:', item);
         if (mapRef.current && item.location?.coordinates) {
@@ -37,12 +86,29 @@ const MapContainer = () => {
         }
     }, []); // Add dependencies if needed (e.g., handleMarkerClick)
 
+    // Handle closing the item detail modal
+    const handleCloseModal = useCallback(() => {
+        setIsModalOpen(false);
+        setSelectedItemId(null);
+    }, []);
+
     console.log('MapContainer: Reaching return statement'); // <-- ADDED FOR DEBUGGING
 
     return (
         <div className="map-container-wrapper">
             <h1>Test Search Bar Location</h1>
-            <MapSearchBar onSearchResultSelect={handleSearchResultSelect} />
+            {/* Wrap search bar in div with fixed height to prevent layout shifts */}
+            <div style={{ 
+                height: '60px',  /* Fixed height container for the search bar */
+                width: '100%',
+                marginBottom: '10px'
+            }}>
+                <MapSearchBar 
+                    onSearchResultSelect={handleSearchResultSelect} 
+                    userLocation={userLocationForMap}
+                    allItems={items}
+                />
+            </div>
             <div ref={mapContainerRef} className="map-container" />
             {error && <div className="map-error-overlay">Error: {error}</div>}
             {!mapLoaded && <div className="map-loading-overlay">Loading Map...</div>}

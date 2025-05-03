@@ -7,9 +7,36 @@
     min-width: 300px;
     max-width: 600px;
     z-index: 1000; /* Ensure it's above map but below modal popups potentially */
+    /* Prevent layout jittering */
+    height: 56px;
+    contain: layout size;
 }
 
 .map-search-popper {
     /* Popper inherits width from anchorEl (TextField) via sx prop */
     z-index: 1001; /* Ensure popper is above the input field */
+    /* Prevent layout jittering */
+    position: fixed !important;
+    contain: layout;
+    will-change: transform;
+}
+
+/* Apply hardware acceleration to reduce jitter */
+.MuiTextField-root {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* Ensure the container stays stable */
+.map-container-wrapper {
+    contain: layout style;
+    position: relative;
+}
+
+/* Prevent reflow when suggestions appear */
+.MuiPopper-root {
+    position: fixed !important;
+    pointer-events: auto;
+    will-change: transform;
 } 
