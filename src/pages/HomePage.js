@@ -1,6 +1,7 @@
 import React from 'react';
 import MapContainer from '../components/MapContainer.js';
 import '../styles/MapContainer.css';
+import './HomePage.css';
 
 const HomePage = () => {
   return (

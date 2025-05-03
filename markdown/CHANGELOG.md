@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - HomePage with placeholder for map
     - AdminPage with dashboard structure
     - DetailPage with route parameter support
+  - **Map Search Bar:**
+    - Created `MapSearchBar` component (`src/components/map/MapSearchBar.js`) with MUI `TextField` and `Popper`.
+    - Implemented basic search input with debouncing.
+    - Added `searchItems` function to `firestoreService.js` for prefix-based item name searching.
+    - Integrated `MapSearchBar` into `MapContainer.js`.
+    - Added basic popover display for search suggestions.
+    - Implemented map navigation (`flyTo`) on search result selection.
 
 - Configuration
   - Added API keys and tokens for:

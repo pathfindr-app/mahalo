@@ -52,7 +52,9 @@ This document outlines the file structure of the MAHALO project, provides descri
 │   │   │   └── ItemForm.js     # Comprehensive form for creating/editing items (details, location, tags, etc.).
 │   │   ├── map/                # Components related to map display/interaction
 │   │   │   └── MapPicker.js    # Mapbox GL component for selecting coords via map click/drag, geolocation, or manual input.
-│   │   └── MapContainer.js     # Main Mapbox GL map view component, displaying user location.
+│   │   └── MapContainer.js     # Main Mapbox GL map view component, displaying user location, items, and search bar.
+│   │   ├── MapSearchBar.js   # Search input component with suggestion popover for the map.
+│   │   └── MapSearchBar.css  # Styles for the MapSearchBar.
 │   ├── context/                # React context providers
 │   │   └── AuthContext.js      # Context for managing authentication state
 │   ├── pages/                  # Page-level components (containers for features)
@@ -105,7 +107,9 @@ This document outlines the file structure of the MAHALO project, provides descri
             *   `ItemForm.js`: A large, multi-section form component responsible for both creating new items and editing existing ones. Manages complex nested state including presentation details like custom logo uploads (`logoUrl`) and React Icon selection (`icon`). Integrates `MapPicker`, `ImageUploader`, `IconPickerModal`, and handles submission via `firestoreService`.
         *   **`map/`**: Components related to map features.
             *   `MapPicker.js`: Integrates Mapbox GL JS to provide an interactive map for coordinate selection. Allows users to set latitude/longitude by clicking the map, dragging a marker, using browser geolocation, or entering values manually into input fields. Handles initial coordinates, bounds checking (Maui), map initialization/cleanup, and calls back with the selected location.
-            *   `MapContainer.js`: The primary map component using Mapbox GL JS. Initializes the map, displays items from Firestore as markers (using custom logo, React Icon, or fallback), handles user location, and opens `ItemDetailModal` on marker click.
+            *   `MapContainer.js`: The primary map component using Mapbox GL JS. Initializes the map, displays items from Firestore as markers (using custom logo, React Icon, or fallback), handles user location, integrates the `MapSearchBar`, and opens `ItemDetailModal` on marker click.
+            *   `MapSearchBar.js`: Provides a search input field positioned over the map. Includes debouncing, calls `firestoreService.searchItems`, and displays results/suggestions in an MUI Popper. Triggers map navigation on result selection.
+            *   `MapSearchBar.css`: Contains positioning and styling rules for the `MapSearchBar` component and its Popper.
     *   **`context/`**: Holds React Context API implementations for global state management.
         *   `AuthContext.js`: Provides authentication state (current user, loading status, error) and functions (login, loginWithGoogle, logout, resetPassword, updateProfile) to components throughout the app via the `useAuth` hook.
     *   **`pages/`**: Intended for top-level components representing distinct application pages or views. *Note: Current routing seems handled directly in `App.js` referencing components, making some page components potentially unused or placeholders.*
@@ -115,7 +119,7 @@ This document outlines the file structure of the MAHALO project, provides descri
         *   `ItemManagementPage.js`: Provides a dedicated page view for the `ItemForm` component, handling surrounding UI elements like titles, descriptions, post-submission notifications, and navigation.
     *   **`services/`**: Contains modules for handling side effects, external API interactions, and business logic.
         *   `firebase.js`: Configures and initializes the Firebase SDK.
-        *   `firestoreService.js`: Provides CRUD (Create, Read, Update, Delete) functions specifically for the `Items` collection in Firestore, including automatic timestamp handling.
+        *   `firestoreService.js`: Provides CRUD (Create, Read, Update, Delete) functions specifically for the `Items` and `Deals` collections in Firestore, including automatic timestamp handling and item searching (`searchItems`).
         *   `cloudFunctionsService.js`: Provides methods to interact with Cloud Functions.
         *   `storageService.js`: Handles interactions with Firebase Storage, including uploading, deleting, and retrieving images.
     *   **`styles/`**: Contains additional CSS files. *Note: There might be overlap or redundancy with `index.css` and `App.css` at the root `src` level. Consolidating might be beneficial.*

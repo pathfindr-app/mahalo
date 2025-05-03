@@ -67,7 +67,6 @@ const MapContainer = () => {
 
   // Get user authentication status
   const { currentUser } = useAuth();
-  // Determine admin status (adjust property name if needed, e.g., currentUser.claims.admin)
   const isAdmin = currentUser?.isAdmin || false;
 
   // --- ADDED: Callback for search result selection ---
@@ -214,10 +213,15 @@ const MapContainer = () => {
         
         // Add click event to marker element
         el.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation(); // Prevent triggering map click
           console.log(`Marker clicked: ${item.name} (ID: ${item.id})`); // Log click
-          setSelectedItem(item.id);
-          setIsModalOpen(true);
+          
+          // Use a timeout to ensure this runs after any other event handlers
+          setTimeout(() => {
+            setSelectedItem(item.id);
+            setIsModalOpen(true);
+          }, 10);
         });
         
         // Store marker reference
@@ -358,11 +362,21 @@ const MapContainer = () => {
     const initializeMap = async () => {
       try {
         if (map.current) return; // Skip if map already initialized
+
+        // *** ADDED: Log the container element ***
+        console.log('Map container element:', mapContainer.current);
+        if (!mapContainer.current) {
+          console.error('Map container ref is not attached!');
+          setIsLoading(false);
+          setError('Map container element not found.');
+          return; 
+        }
+        // *** END ADDED ***
         
         console.log('Initializing map...');
         map.current = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/light-v11', // Use a lighter style for better performance
+          container: mapContainer.current, // Use the ref here
+          style: 'mapbox://styles/mapbox/light-v11', 
           center: [viewport.lng, viewport.lat],
           zoom: viewport.zoom,
           minZoom: 5, // Allow zooming out further (was 8)
@@ -415,14 +429,18 @@ const MapContainer = () => {
 
         // Set up event handlers
         map.current.on('load', () => {
-          console.log('Map loaded');
+          console.log('Map loaded event fired'); // More specific log
           setIsLoading(false);
-          
-          // Create markers once the map is loaded (if we have items)
           if (items.length > 0) {
             createItemMarkers();
           }
         });
+        
+        // *** ADDED: Listen for render event ***
+        map.current.on('render', () => {
+          console.log('Map render event fired'); 
+        });
+        // *** END ADDED ***
         
         // Reduce rendering during active panning to improve performance
         map.current.on('movestart', () => {
@@ -443,10 +461,13 @@ const MapContainer = () => {
           
           moveEndTimeout.current = setTimeout(() => {
             if (map.current) {
+              const center = map.current.getCenter();
+              const zoom = map.current.getZoom();
+              
               setViewport({
-                lng: map.current.getCenter().lng.toFixed(4),
-                lat: map.current.getCenter().lat.toFixed(4),
-                zoom: map.current.getZoom().toFixed(2)
+                lng: center && typeof center.lng === 'number' ? center.lng.toFixed(4) : '0.0000',
+                lat: center && typeof center.lat === 'number' ? center.lat.toFixed(4) : '0.0000',
+                zoom: typeof zoom === 'number' ? zoom.toFixed(2) : '0.00'
               });
             }
           }, 300); // Increased timeout for better performance
@@ -491,7 +512,7 @@ const MapContainer = () => {
         map.current = null;
       }
     };
-  }, []); // Remove viewport and items from dependency array to prevent map reinitialization
+  }, []);
 
   // Create markers when items change
   useEffect(() => {
@@ -526,23 +547,26 @@ const MapContainer = () => {
     
     // Calculate if the change is significant enough to animate
     const centerChanged = 
-      Math.abs(currentCenter.lng - parseFloat(viewport.lng)) > 0.001 || 
-      Math.abs(currentCenter.lat - parseFloat(viewport.lat)) > 0.001;
+      Math.abs(currentCenter.lng - (typeof viewport.lng === 'string' ? parseFloat(viewport.lng) : viewport.lng || 0)) > 0.001 || 
+      Math.abs(currentCenter.lat - (typeof viewport.lat === 'string' ? parseFloat(viewport.lat) : viewport.lat || 0)) > 0.001;
     
-    const zoomChanged = Math.abs(currentZoom - parseFloat(viewport.zoom)) > 0.1;
+    const zoomChanged = Math.abs(currentZoom - (typeof viewport.zoom === 'string' ? parseFloat(viewport.zoom) : viewport.zoom || 0)) > 0.1;
     
     // Only animate if there's a significant change
     if (centerChanged || zoomChanged) {
       // For small zoom changes, use jumpTo instead of flyTo for better performance
-      if (!centerChanged && zoomChanged && Math.abs(currentZoom - parseFloat(viewport.zoom)) < 1) {
+      if (!centerChanged && zoomChanged && Math.abs(currentZoom - (typeof viewport.zoom === 'string' ? parseFloat(viewport.zoom) : viewport.zoom || 0)) < 1) {
         map.current.jumpTo({
-          zoom: parseFloat(viewport.zoom)
+          zoom: typeof viewport.zoom === 'string' ? parseFloat(viewport.zoom) : viewport.zoom || currentZoom
         });
       } else {
         // Use flyTo for significant changes
         map.current.flyTo({
-          center: [parseFloat(viewport.lng), parseFloat(viewport.lat)],
-          zoom: parseFloat(viewport.zoom),
+          center: [
+            typeof viewport.lng === 'string' ? parseFloat(viewport.lng) : viewport.lng || currentCenter.lng,
+            typeof viewport.lat === 'string' ? parseFloat(viewport.lat) : viewport.lat || currentCenter.lat
+          ],
+          zoom: typeof viewport.zoom === 'string' ? parseFloat(viewport.zoom) : viewport.zoom || currentZoom,
           essential: true,
           speed: 2.0, // Faster animation
           curve: 1,
@@ -564,52 +588,39 @@ const MapContainer = () => {
   }
 
   return (
-    // Use a wrapper div to establish positioning context
+    // Added wrapper div
     <div className="map-container-wrapper"> 
-      {isLoading && <div className="map-loading">Loading map...</div>}
-      
-      {/* --- ADDED: Render Search Bar --- */}
+      {/* Search Bar moved inside the wrapper */}
       <MapSearchBar onSearchResultSelect={handleSearchResultSelect} />
-      {/* --- END ADDED --- */}
+
+      {/* Map container div - Use map-container class for height */}
+      <div ref={mapContainer} className="map-container" /> 
+
+      {/* Loading and Error Overlays */}
+      {isLoading && (
+        <div className="map-loading">
+          <div>Loading Map...</div> {/* Replace with spinner if desired */}
+        </div>
+      )}
+      {error && <div className="map-error">Error: {error}</div>}
       
-      <div 
-        ref={mapContainer} 
-        style={{ 
-          width: '100%', 
-          height: '100%', // Occupy full height of wrapper
-          // Removed position:relative and overflow:hidden from inline style
-        }} 
-        className="mapboxgl-map-container" // Retain class if needed by Mapbox
-      />
-      <div style={{ 
-        position: 'absolute', 
-        bottom: '20px', 
-        left: '20px', 
-        backgroundColor: 'rgba(255, 255, 255, 0.8)', 
-        padding: '10px', 
-        borderRadius: '4px', 
-        zIndex: 10, // Lower z-index than search bar
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        fontSize: '12px'
-      }}>
-        <p>
-          Longitude: {viewport.lng} | Latitude: {viewport.lat} | Zoom: {viewport.zoom}
-        </p>
-        {userLocation && (
-          <p style={{ marginTop: '8px', color: '#2196F3', fontWeight: 500 }}>
-            Your location: {userLocation.lng.toFixed(4)}, {userLocation.lat.toFixed(4)}
-          </p>
-        )}
-      </div>
-      
+      {/* User Location Display */}
+      {userLocation && (
+        <div className="map-overlay">
+          Your location: {userLocation.lng.toFixed(4)}, {userLocation.lat.toFixed(4)} (Zoom: {typeof viewport.zoom === 'number' ? viewport.zoom.toFixed(2) : '0.00'})
+        </div>
+      )}
+
       {/* Item Detail Modal */}
-      <ItemDetailModal 
-        open={isModalOpen} // Assuming ItemDetailModal uses 'open' prop
-        onClose={handleCloseModal}
-        itemId={selectedItem}
-        // isAdmin={isAdmin} // Pass isAdmin if needed by modal
-      />
-    </div>
+      {isModalOpen && selectedItem && (
+        <ItemDetailModal
+          isOpen={isModalOpen}
+          itemId={selectedItem}
+          onClose={handleCloseModal}
+          isAdmin={isAdmin} // Pass admin status
+        />
+      )}
+    </div> // End wrapper div
   );
 };
 

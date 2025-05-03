@@ -440,3 +440,42 @@ service cloud.firestore {
     *   Confirm the write operation succeeds based on current authentication/admin rules.
 4.  **Efficiency Note:**
     *   Document the need for Firestore index configuration and testing once querying is implemented.
+
+## Map Search Implementation (Ongoing)
+
+**Goal:** Implement a search bar on the map view (`MapContainer.js`) allowing users to find items (vendors, POIs) by name.
+
+**Components:**
+*   `src/components/map/MapSearchBar.js`: The main search component using MUI `TextField` and `Popper`.
+*   `src/components/map/MapSearchBar.css`: Styles for positioning and appearance.
+*   `src/components/MapContainer.js`: Integrates and renders the `MapSearchBar`.
+*   `src/services/firestoreService.js`: Contains the `searchItems` function for querying Firestore.
+
+**Current Functionality (Basic):**
+*   Search bar is displayed over the map.
+*   Input is debounced (300ms delay).
+*   Triggers `firestoreService.searchItems` when input length > 2.
+*   `searchItems` performs a case-sensitive prefix search on the `name` field in the `Items` collection.
+*   Search results (or loading/error/no results state) are displayed in a Popper dropdown below the search bar.
+*   Selecting a result triggers `map.flyTo` to navigate the map to the item's location.
+
+**Design Decisions:**
+*   The search results popover is intended for quick lookup and navigation. It will remain distinct from any potential future "user modal" that might display more comprehensive user-specific data like full lists of favorites or claimed deals.
+
+**Next Steps / TODOs:**
+*   [ ] Refine UI/UX of the search results list (e.g., add item icons/logos, improve layout).
+*   [ ] Implement location actions in the popover (e.g., buttons/icons to copy coordinates, generate links for Google/Apple Maps).
+*   [ ] Address case-insensitivity for search (likely requires adding/querying a lowercase `name` field in Firestore).
+*   [ ] Consider searching additional fields (e.g., `tags`, `description.brief`).
+*   [ ] Implement basic display of Favorites/Claimed Deals within the search popover (requires implementing those features first).
+*   [ ] Add Firestore index for `Items` collection on `name` field (Ascending) if prompted by Firestore errors.
+
+## Firebase Security Rules
+
+# ... (Existing rules) ...
+
+## Next Steps
+
+**CURRENT FOCUS:** Continue development of the Map Search feature (UI refinement, location actions, case-insensitive search).
+
+# ... (Rest of the file) ...

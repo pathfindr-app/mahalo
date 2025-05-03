@@ -45,4 +45,6 @@ code {
   .container {
     padding: 0 0.5rem;
   }
-} 
+}
+
+/* REMOVED styles for .home-page that added padding */ 

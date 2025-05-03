@@ -1,6 +1,6 @@
 .map-search-container {
     position: absolute; /* Position relative to the wrapper */
-    top: 10px;
+    top: 10px; /* Position near the top of the map container */
     left: 50%;
     transform: translateX(-50%);
     width: 40%; /* Adjust width as needed */

@@ -1,9 +1,24 @@
 .app {
   min-height: 100vh;
+  height: 100vh;
   background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent scrolling on the app container */
 }
 
 .main-content {
-  padding-top: 80px; /* Height of header + some spacing */
-  min-height: calc(100vh - 80px);
+  padding-top: 60px; /* Adjust based on actual Header height */
+  flex-grow: 1; /* Allow content to take remaining space */
+  height: calc(100vh - 60px); /* Explicit height calculation */
+  /* Ensure map container inside can use 100% height */
+  display: flex; 
+  flex-direction: column;
+  overflow: hidden; /* Prevent scrolling */
+}
+
+/* Ensure children of main-content (like .home-page or the wrapper inside it) can expand */
+.main-content > * {
+  flex-grow: 1;
+  height: 100%;
 } 
