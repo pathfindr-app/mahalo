@@ -1,0 +1,15 @@
+.map-search-container {
+    position: absolute; /* Position relative to the wrapper */
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40%; /* Adjust width as needed */
+    min-width: 300px;
+    max-width: 600px;
+    z-index: 1000; /* Ensure it's above map but below modal popups potentially */
+}
+
+.map-search-popper {
+    /* Popper inherits width from anchorEl (TextField) via sx prop */
+    z-index: 1001; /* Ensure popper is above the input field */
+} 

@@ -442,6 +442,47 @@ export const getDeals = async () => {
   }
 };
 
+/**
+ * Searches items by name prefix (case-sensitive).
+ * TODO: Implement case-insensitive search, potentially by querying a 'name_lowercase' field.
+ * TODO: Consider searching other fields like tags or brief description.
+ * TODO: Implement pagination if results can be large.
+ * @param {string} searchText The text to search for.
+ * @param {number} resultLimit Max number of results to return.
+ * @returns {Promise<Array<Object>>} A promise resolving to an array of matching item objects.
+ */
+export const searchItems = async (searchText, resultLimit = 10) => {
+  if (!searchText) {
+    return [];
+  }
+
+  console.log(`Firestore: Searching for items starting with "${searchText}"`);
+
+  // Firestore range queries are case-sensitive.
+  // A common workaround is to store a lowercase version of the field.
+  // For now, performing a case-sensitive prefix search.
+  const searchQuery = query(
+    itemsCollectionRef,
+    where('name', '>=', searchText),
+    where('name', '<=', searchText + '\uf8ff'), // \uf8ff is a high Unicode character for prefix matching
+    orderBy('name'), // Order by name to make the range query work correctly
+    limit(resultLimit)
+  );
+
+  try {
+    const querySnapshot = await getDocs(searchQuery);
+    const items = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    console.log(`Firestore: Found ${items.length} items matching "${searchText}"`);
+    return items;
+  } catch (error) {
+    console.error("Error searching items:", error);
+    throw error; // Re-throw the error to be caught by the caller
+  }
+};
+
 // Export all functions
 export default {
   createItem,
@@ -455,4 +496,5 @@ export default {
   updateDeal,
   deleteDeal,
   getDeals,
+  searchItems,
 }; 

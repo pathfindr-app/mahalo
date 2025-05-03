@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactDOM from 'react-dom'; // Import ReactDOM
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -6,6 +6,7 @@ import { queryItems } from '../services/firestoreService.js';
 import ItemDetailModal from './modals/ItemDetailModal.js';
 import '../styles/MapContainer.css'; // Ensure the CSS is imported
 import { useAuth } from '../context/AuthContext'; // Import useAuth
+import MapSearchBar from './map/MapSearchBar'; // <-- Import MapSearchBar
 
 // Import the specific icon sets used in the form/data
 import * as FaIcons from 'react-icons/fa';
@@ -68,6 +69,22 @@ const MapContainer = () => {
   const { currentUser } = useAuth();
   // Determine admin status (adjust property name if needed, e.g., currentUser.claims.admin)
   const isAdmin = currentUser?.isAdmin || false;
+
+  // --- ADDED: Callback for search result selection ---
+  const handleSearchResultSelect = useCallback((item) => {
+    console.log('Navigating to selected item:', item);
+    if (map.current && item.location?.coordinates) {
+        const { lat, lng } = item.location.coordinates;
+        map.current.flyTo({
+            center: [lng, lat],
+            zoom: 15, // Zoom closer when selecting an item
+            essential: true
+        });
+        // Optionally open the modal directly
+        // handleMarkerClick(item.id); // Requires handleMarkerClick to be defined
+    }
+  }, []); // Dependencies: map.current (technically stable)
+  // --- END ADDED ---
 
   // Function to create item markers on the map
   const createItemMarkers = () => {
@@ -547,17 +564,22 @@ const MapContainer = () => {
   }
 
   return (
-    <div className="map-container">
+    // Use a wrapper div to establish positioning context
+    <div className="map-container-wrapper"> 
       {isLoading && <div className="map-loading">Loading map...</div>}
+      
+      {/* --- ADDED: Render Search Bar --- */}
+      <MapSearchBar onSearchResultSelect={handleSearchResultSelect} />
+      {/* --- END ADDED --- */}
+      
       <div 
         ref={mapContainer} 
         style={{ 
           width: '100%', 
-          height: '100vh', 
-          position: 'relative',
-          overflow: 'hidden' // Ensure content doesn't leak
+          height: '100%', // Occupy full height of wrapper
+          // Removed position:relative and overflow:hidden from inline style
         }} 
-        className="mapboxgl-map-container" // Add class for CSS targeting
+        className="mapboxgl-map-container" // Retain class if needed by Mapbox
       />
       <div style={{ 
         position: 'absolute', 
@@ -566,7 +588,7 @@ const MapContainer = () => {
         backgroundColor: 'rgba(255, 255, 255, 0.8)', 
         padding: '10px', 
         borderRadius: '4px', 
-        zIndex: 10,
+        zIndex: 10, // Lower z-index than search bar
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
         fontSize: '12px'
       }}>
@@ -582,10 +604,10 @@ const MapContainer = () => {
       
       {/* Item Detail Modal */}
       <ItemDetailModal 
-        isOpen={isModalOpen}
+        open={isModalOpen} // Assuming ItemDetailModal uses 'open' prop
         onClose={handleCloseModal}
         itemId={selectedItem}
-        isAdmin={isAdmin}
+        // isAdmin={isAdmin} // Pass isAdmin if needed by modal
       />
     </div>
   );

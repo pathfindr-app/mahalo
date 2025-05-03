@@ -1,8 +1,13 @@
-.map-container {
-  position: relative;
-  height: calc(100vh - 60px); /* Adjust based on your header height */
+.map-container-wrapper {
+  position: relative; /* Ensure positioned context for absolute children */
   width: 100%;
-  overflow: hidden;
+  height: calc(100vh - 64px); /* Adjust 64px based on actual header height */
+  /* Removed overflow: hidden; if it exists, as it might clip the Popper */
+}
+
+.map-container {
+  height: 100%; /* Use full height of wrapper */
+  width: 100%;
 }
 
 .mapboxgl-map-container {
