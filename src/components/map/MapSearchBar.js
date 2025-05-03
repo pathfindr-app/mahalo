@@ -337,11 +337,8 @@ const MapSearchBar = ({ onSearchResultSelect, userLocation, allItems }) => { // 
         style={{ 
           zIndex: 1301, 
           width: searchContainerRef.current?.offsetWidth,
-          // Use absolute positioning and remove from normal document flow
-          position: 'fixed',
         }}
         onMouseDown={handlePopperMouseDown}
-        disablePortal={true} // Use true to completely remove from document flow
         keepMounted
         modifiers={[
           {

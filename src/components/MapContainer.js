@@ -319,10 +319,11 @@ const MapContainer = () => {
               logoUrl: item.presentation?.logoUrl || null // <<< Add logoUrl
             },
             type: item.type || 'poi',
-            description: item.description || { brief: '' } // Ensure description object exists
+            description: item.description || { brief: '' }, // Ensure description object exists
+            tags: item.tags || [] // <<< ADDED: Include tags, defaulting to empty array
           };
           
-          console.log(`Normalized item ${normalizedItem.name}: coordinates [${normalizedItem.location.coordinates.lng}, ${normalizedItem.location.coordinates.lat}], logo: ${normalizedItem.presentation.logoUrl}, icon: ${normalizedItem.presentation.icon}`);
+          console.log(`Normalized item ${normalizedItem.name}: coordinates [${normalizedItem.location.coordinates.lng}, ${normalizedItem.location.coordinates.lat}], logo: ${normalizedItem.presentation.logoUrl}, icon: ${normalizedItem.presentation.icon}, tags: [${(normalizedItem.tags || []).join(', ')}]`); // <-- Updated log
           
           return normalizedItem;
         });
@@ -588,39 +589,44 @@ const MapContainer = () => {
   }
 
   return (
-    // Added wrapper div
-    <div className="map-container-wrapper"> 
-      {/* Search Bar moved inside the wrapper */}
-      <MapSearchBar onSearchResultSelect={handleSearchResultSelect} />
+    <div 
+      className="map-container-wrapper"
+      style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}
+    >
+      <MapSearchBar 
+        onSearchResultSelect={handleSearchResultSelect} 
+        allItems={items}
+        userLocation={userLocation}
+      />
 
-      {/* Map container div - Use map-container class for height */}
-      <div ref={mapContainer} className="map-container" /> 
+      <div 
+        ref={mapContainer} 
+        className="map-container" 
+        style={{ flexGrow: 1, height: 'auto' }}
+      /> 
 
-      {/* Loading and Error Overlays */}
       {isLoading && (
         <div className="map-loading">
-          <div>Loading Map...</div> {/* Replace with spinner if desired */}
+          <div>Loading Map...</div>
         </div>
       )}
       {error && <div className="map-error">Error: {error}</div>}
       
-      {/* User Location Display */}
       {userLocation && (
         <div className="map-overlay">
           Your location: {userLocation.lng.toFixed(4)}, {userLocation.lat.toFixed(4)} (Zoom: {typeof viewport.zoom === 'number' ? viewport.zoom.toFixed(2) : '0.00'})
         </div>
       )}
 
-      {/* Item Detail Modal */}
       {isModalOpen && selectedItem && (
         <ItemDetailModal
           isOpen={isModalOpen}
           itemId={selectedItem}
           onClose={handleCloseModal}
-          isAdmin={isAdmin} // Pass admin status
+          isAdmin={isAdmin}
         />
       )}
-    </div> // End wrapper div
+    </div>
   );
 };
 
