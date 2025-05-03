@@ -19,6 +19,29 @@ import { getItem } from '../../services/firestoreService';
 import { queryDeals } from '../../services/firestoreService';
 import './ItemDetailModal.css';
 
+// Import the specific icon sets used in the form/data
+import * as FaIcons from 'react-icons/fa';
+import * as MdIcons from 'react-icons/md';
+// Add other sets if needed
+
+// Combine the icons for lookup
+const ICON_COMPONENTS = {
+  ...FaIcons,
+  ...MdIcons,
+  // ... add other sets here
+};
+
+// Helper function to get the icon component by name (similar to other components)
+const getIconComponent = (iconName, size = 24) => {
+  if (!iconName || typeof iconName !== 'string') return null;
+  const IconComponent = ICON_COMPONENTS[iconName]; 
+  if (!IconComponent) {
+      console.warn(`ItemDetailModal Icon component not found for name: ${iconName}.`);
+      return null;
+  }
+  return IconComponent;
+};
+
 const DetailBlock = ({ title, children, className = "" }) => (
     <Box className={`content-block ${className}`}>
         <Box className="content-block-inner">
@@ -278,14 +301,38 @@ const ItemDetailModal = ({ isOpen, onClose, itemId }) => {
                     />
                 )}
                 <Box className="item-detail-header-content">
-                    <Typography variant="h5" component="h2" className="item-title">
-                        {item.name}
-                    </Typography>
-                    {item.description?.brief && (
-                        <Typography variant="body1" className="item-brief">
-                            {item.description.brief}
-                        </Typography>
-                    )}
+                    {/* Icon/Logo Display */}                    
+                    <Box sx={{ mr: 1.5, alignSelf: 'flex-start' /* Align top */ }}>
+                      {item.presentation?.logoUrl ? (
+                        <img 
+                          src={item.presentation.logoUrl} 
+                          alt={`${item.name} logo`} 
+                          style={{ 
+                            width: 40, 
+                            height: 40, 
+                            objectFit: 'contain', 
+                            borderRadius: '4px' // Slight rounding
+                          }} 
+                        />
+                      ) : item.presentation?.icon ? (
+                        (() => { // IIFE to use helper function
+                          const IconComp = getIconComponent(item.presentation.icon, 32); // Slightly larger icon
+                          return IconComp ? <IconComp /> : null;
+                        })()
+                      ) : null /* Add category/default fallback here if needed */}
+                    </Box>
+
+                    {/* Title and Brief */}                    
+                    <Box sx={{ flexGrow: 1 }}> 
+                      <Typography variant="h5" component="h2" className="item-title">
+                          {item.name}
+                      </Typography>
+                      {item.description?.brief && (
+                          <Typography variant="body1" className="item-brief">
+                              {item.description.brief}
+                          </Typography>
+                      )}
+                    </Box>
                 </Box>
                 <IconButton onClick={onClose} className="close-button" size="small">
                     <CloseIcon />

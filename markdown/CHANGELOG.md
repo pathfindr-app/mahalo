@@ -103,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented deal analytics structure with claims tracking
   - Added deal status tracking (Active/Inactive/Expired/Fully Claimed)
   - Enhanced AdminDashboard with integrated deal management tab
+- **Icon Strategy Enhancement:**
+  - Added support for uploading custom vendor logos to Firebase Storage via `ItemForm`.
+  - Implemented priority-based display logic (Logo > React Icon > Category Icon) in map markers (`MapContainer`), item list (`ItemList`), and item detail modal (`ItemDetailModal`).
 
 ### Changed
 - Updated import statements to use .js extensions for ES modules compatibility
@@ -122,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed zoom behavior to enable standard mousewheel zoom without requiring Ctrl key
 - Optimized marker creation process to update existing markers instead of recreating them
 - Enhanced CSS with hardware acceleration techniques for smoother rendering
+- **Components Updated for Icon Logic:** Modified `ItemForm`, `MapContainer`, `ItemList`, and `ItemDetailModal` to support and display custom logos and React Icons.
 
 ### Fixed
 - **Deal Display in Modal:** Fixed `ItemDetailModal` not displaying deal validity dates and claim counts.
@@ -158,6 +162,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Resolved map reinitialization issues caused by improper dependency arrays
   - Added intelligent marker management to prevent unnecessary redraws
   - Implemented proper state updates to prevent excessive re-rendering during map interaction
+- **Map Performance:** Significantly improved map performance and user experience
+  - Fixed markers not staying locked to their GPS coordinates during map panning
+  - Removed distracting accuracy circle around user location
+  - Fixed janky/stuttering behavior when panning the map
+  - Enabled standard mousewheel zoom without requiring Ctrl key
+  - Extended zoom out capability to see more of the map area
+- **Map Rendering:** Enhanced map rendering with hardware acceleration
+  - Added CSS optimizations for smoother marker rendering
+  - Implemented more efficient marker management
+  - Changed to a lighter map style for better performance
+  - Added intelligent viewport updates to reduce unnecessary state changes
 
 ## [0.1.0] - 2024-03-XX
 - Initial project setup and basic structure implementation

@@ -97,6 +97,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     },
     presentation: {
       icon: '',
+      logoUrl: null,
       container: {
         opacity: 100,
         blur: 0,
@@ -161,6 +162,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
       presentation: { 
           ...prevData.presentation, // Keep container, etc.
           icon: '', // Reset icon here
+          logoUrl: null,
           headerImage: null, 
           gallery: [] 
       },
@@ -233,6 +235,7 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                     ...formData.presentation,
                      ...(itemData.presentation || {}), // Spread presentation object first
                      icon: itemData.presentation?.icon || itemData.icon || '', // Use presentation.icon, fallback to top-level icon if exists, then default
+                     logoUrl: itemData.presentation?.logoUrl || null,
                      container: {
                         ...formData.presentation.container,
                         ...((itemData.presentation && itemData.presentation.container) || {})
@@ -514,11 +517,12 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
         ...formData.presentation,
         headerImage: formData.presentation.headerImage ? {
           ...formData.presentation.headerImage,
-          // No processing needed - base64 data is already stored in the url field
+          // URL from storageService is already correct
         } : null,
+        logoUrl: formData.presentation.logoUrl || null,
         gallery: formData.presentation.gallery ? formData.presentation.gallery.map(img => ({
           ...img,
-          // No processing needed - base64 data is already stored in the url field
+          // URL from storageService is already correct
         })) : []
       }
     };
@@ -619,6 +623,34 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
     }
     
     return EditorState.createEmpty();
+  };
+
+  // Handler for Logo Upload
+  const handleLogoUpload = (downloadUrl, storagePath) => {
+    console.log("**** handleLogoUpload CALLED ****");
+    console.log("Logo uploaded to Storage:", downloadUrl, storagePath);
+    // Store only the download URL in the state
+    setFormData(prev => ({
+      ...prev,
+      presentation: {
+        ...prev.presentation,
+        logoUrl: downloadUrl
+      }
+    }));
+  };
+
+  // Handler for Logo Deletion
+  const handleLogoDelete = (imagePath) => { // ImageUploader passes path on delete
+    console.log("Attempting to delete Logo image from Storage:", imagePath);
+    // ImageUploader handles the actual deletion via storageService
+    // Update the form state to remove the URL
+    setFormData(prev => ({
+      ...prev,
+      presentation: {
+        ...prev.presentation,
+        logoUrl: null
+      }
+    }));
   };
 
   // Updated handler for Header Image upload using ImageUploader
@@ -1065,6 +1097,21 @@ function ItemForm({ itemId, onSubmissionSuccess, onCancel }) {
                       idSuffix="header"
                     />
                   </div>
+
+                  {/* --- Custom Logo Upload --- */}                  
+                  <div className="form-group">
+                    <ImageUploader
+                      title="Custom Logo (Overrides Icon)"
+                      imageUrl={formData.presentation?.logoUrl || null}
+                      storagePath={`items/${getStorageId()}/logo`}
+                      onImageUploaded={handleLogoUpload}
+                      onImageDeleted={handleLogoDelete}
+                      allowMultiple={false}
+                      buttonLabel={formData.presentation?.logoUrl ? 'Replace Custom Logo' : 'Upload Custom Logo'}
+                      idSuffix="logo" // Unique ID suffix
+                    />
+                  </div>
+                  {/* --- End Custom Logo Upload --- */}
 
                   {/* Gallery Images Upload - Using ImageUploader */}
                   <div className="form-group">

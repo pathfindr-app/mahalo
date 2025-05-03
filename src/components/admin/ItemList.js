@@ -30,6 +30,29 @@ import { ALL_TAGS, POI_TYPES } from '../../utils/constants.js';
 // Remove useNavigate if it's no longer used directly for navigation within this component
 // import { useNavigate } from 'react-router-dom'; 
 
+// Import React Icons for display
+import * as FaIcons from 'react-icons/fa';
+import * as MdIcons from 'react-icons/md';
+// Add other sets if needed
+
+// Combine the icons for lookup
+const ICON_COMPONENTS = {
+  ...FaIcons,
+  ...MdIcons,
+  // ... add other sets here
+};
+
+// Helper function to get the icon component by name (similar to MapContainer)
+const getIconComponent = (iconName, size = 24) => { // Default size slightly larger for table
+  if (!iconName || typeof iconName !== 'string') return null;
+  const IconComponent = ICON_COMPONENTS[iconName]; 
+  if (!IconComponent) {
+      console.warn(`ItemList Icon component not found for name: ${iconName}.`);
+      return null;
+  }
+  return IconComponent;
+};
+
 function ItemList({ onCreateNew, onEditItem }) { // Destructure props
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -300,6 +323,7 @@ function ItemList({ onCreateNew, onEditItem }) { // Destructure props
         <Table stickyHeader aria-label="sticky table">
           <TableHead>
             <TableRow>
+              <TableCell sx={{ width: '50px' }}>Icon</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Brief Description</TableCell>
@@ -310,40 +334,63 @@ function ItemList({ onCreateNew, onEditItem }) { // Destructure props
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">No items found.</TableCell>
+                <TableCell colSpan={6} align="center">No items found.</TableCell>
               </TableRow>
             ) : (
-              items.map((item) => (
-                <TableRow hover role="checkbox" tabIndex={-1} key={item.id}>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.type}</TableCell>
-                  <TableCell>{item.description?.brief || 'N/A'}</TableCell>
-                  <TableCell>
-                    {item.tags && item.tags.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {item.tags.slice(0, 3).map((tag) => (
-                          <Chip key={tag} label={tag.replace(/-/g, ' ')} size="small" />
-                        ))}
-                        {item.tags.length > 3 && (
-                          <Chip label={`+${item.tags.length - 3}`} size="small" variant="outlined" />
-                        )}
-                      </Box>
-                    ) : (
-                      'No tags'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      size="small" 
-                      onClick={() => handleEditItem(item.id)}
-                      sx={{ mr: 1 }}
-                      variant="outlined"
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              items.map((item) => {
+                // Determine icon/logo to display
+                let iconElement = null;
+                if (item.presentation?.logoUrl) {
+                  iconElement = (
+                    <img 
+                      src={item.presentation.logoUrl} 
+                      alt={`${item.name} logo`} 
+                      style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: '4px' }} 
+                    />
+                  );
+                } else if (item.presentation?.icon) {
+                  const IconComp = getIconComponent(item.presentation.icon);
+                  if (IconComp) {
+                    iconElement = <IconComp size={24} />;
+                  }
+                }
+                // Add fallback for category/default icon here if needed in the future
+
+                return (
+                  <TableRow hover role="checkbox" tabIndex={-1} key={item.id}>
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      {iconElement || '-'}
+                    </TableCell>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>{item.type}</TableCell>
+                    <TableCell>{item.description?.brief || 'N/A'}</TableCell>
+                    <TableCell>
+                      {item.tags && item.tags.length > 0 ? (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {item.tags.slice(0, 3).map((tag) => (
+                            <Chip key={tag} label={tag.replace(/-/g, ' ')} size="small" />
+                          ))}
+                          {item.tags.length > 3 && (
+                            <Chip label={`+${item.tags.length - 3}`} size="small" variant="outlined" />
+                          )}
+                        </Box>
+                      ) : (
+                        'No tags'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        size="small" 
+                        onClick={() => handleEditItem(item.id)}
+                        sx={{ mr: 1 }}
+                        variant="outlined"
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

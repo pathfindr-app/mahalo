@@ -138,41 +138,41 @@ const MapContainer = () => {
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
-        el.style.color = 'white';
-        el.style.fontSize = '18px';
-        el.style.border = '2px solid white';
-        el.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
-        el.style.cursor = 'pointer';
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+        el.style.backgroundRepeat = 'no-repeat';
+        el.innerHTML = '';
         
-        // Set background color based on type or default
+        // Set background color based on type or default (will be overridden by logo if present)
         const bgColor = TYPE_STYLES[item.type]?.color || '#757575';
         el.style.backgroundColor = bgColor;
         
-        // Create a span for the icon to ensure proper centering
-        const iconSpan = document.createElement('span');
-        iconSpan.style.display = 'flex';
-        iconSpan.style.alignItems = 'center';
-        iconSpan.style.justifyContent = 'center';
-        
-        // Get the React Icon component based on the stored name
-        const IconComponent = getIconComponent(item.presentation?.icon);
-        
-        if (IconComponent) {
-          console.log(`Rendering React Icon: ${item.presentation.icon} for ${item.name}`);
-          // Use ReactDOM.render to put the React component into the DOM element
-          // Wrap IconComponent in React.createElement or JSX syntax if possible within this context
-          // Note: Directly using JSX here might require build tool configuration
-          // Using React.createElement is safer if JSX isn't transpiled here.
-          ReactDOM.render(React.createElement(IconComponent, { size: 18, color: 'white' }), iconSpan); 
+        // --- Icon/Logo Logic --- 
+        if (item.presentation?.logoUrl) {
+          // 1. Use Logo URL as background image (highest priority)
+          console.log(`Using logoUrl: ${item.presentation.logoUrl} for ${item.name}`);
+          el.style.backgroundImage = `url(${item.presentation.logoUrl})`;
+          el.style.backgroundColor = 'transparent'; // Ensure background color doesn't interfere
+          // No text/icon needed inside
+
         } else {
-          // Fallback to text/emoji if icon name is invalid or component not found
-          const fallbackIcon = TYPE_STYLES[item.type]?.fallbackIcon || '📍';
-          console.log(`Using fallback icon: "${fallbackIcon}" for ${item.name}`);
-          iconSpan.textContent = fallbackIcon;
+          // 2. Try React Icon (second priority)
+          const IconComponent = getIconComponent(item.presentation?.icon);
+          el.style.color = 'white'; // Set text color for icon/emoji
+          if (IconComponent) {
+            console.log(`Rendering React Icon: ${item.presentation.icon} for ${item.name}`);
+            // Render React Icon inside the element
+            const iconContainer = document.createElement('div'); // Container helps with potential React re-renders
+            ReactDOM.render(React.createElement(IconComponent, { size: 18, color: 'white' }), iconContainer);
+            el.appendChild(iconContainer);
+          } else {
+            // 3. Fallback to text/emoji (lowest priority)
+            const fallbackIcon = TYPE_STYLES[item.type]?.fallbackIcon || '📍';
+            console.log(`Using fallback icon: "${fallbackIcon}" for ${item.name}`);
+            el.textContent = fallbackIcon;
+          }
         }
-        
-        // Append icon span to marker element
-        el.appendChild(iconSpan);
+        // --- End Icon/Logo Logic --- 
         
         // Create popup content
         const popupHTML = `
@@ -286,23 +286,22 @@ const MapContainer = () => {
           const normalizedItem = {
             id: item.id,
             name: item.name || 'Unnamed Item',
-            // Ensure location and coordinates exist with numeric values
             location: {
               coordinates: {
                 lat: lat,
                 lng: lng
               }
             },
-            // Set presentation with icon
+            // Set presentation with icon and logoUrl
             presentation: {
-              icon: item.presentation?.icon || TYPE_STYLES[item.type]?.icon || '📍'
+              icon: item.presentation?.icon || null, // Keep icon or null
+              logoUrl: item.presentation?.logoUrl || null // <<< Add logoUrl
             },
-            // Set other data
             type: item.type || 'poi',
-            description: item.description || {}
+            description: item.description || { brief: '' } // Ensure description object exists
           };
           
-          console.log(`Normalized item ${normalizedItem.name}: coordinates [${normalizedItem.location.coordinates.lng}, ${normalizedItem.location.coordinates.lat}]`);
+          console.log(`Normalized item ${normalizedItem.name}: coordinates [${normalizedItem.location.coordinates.lng}, ${normalizedItem.location.coordinates.lat}], logo: ${normalizedItem.presentation.logoUrl}, icon: ${normalizedItem.presentation.icon}`);
           
           return normalizedItem;
         });

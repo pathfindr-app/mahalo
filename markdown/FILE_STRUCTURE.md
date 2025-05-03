@@ -94,7 +94,7 @@ This document outlines the file structure of the MAHALO project, provides descri
     *   **`components/`**: Contains reusable UI pieces.
         *   **`admin/`**: Components used exclusively within the administrative sections of the application.
             *   `AdminDashboard.js`: The main view for administrators, likely containing tools for managing items, users, etc. Includes tabs for different sections (Items, Analytics, Deals). Uses a Modal for creating/editing items via `ItemForm`.
-            *   `ItemList.js`: Displays a list of items, likely with options to edit or trigger creation.
+            *   `ItemList.js`: Displays a list of items with filtering/sorting. Shows item icon/logo and includes options to edit or trigger creation.
         *   **`auth/`**: Components related to user authentication.
             *   `Login.js`: Provides the user interface for logging in.
         *   **`common/`**: Components shared across different parts of the application.
@@ -102,10 +102,10 @@ This document outlines the file structure of the MAHALO project, provides descri
             *   `ImageUploader.js`: Allows users to upload single or multiple images to Firebase Storage, with preview, delete, and edit functionality.
             *   `DraggableGallery.js`: Provides drag-and-drop functionality for reordering gallery images using @dnd-kit libraries.
         *   **`items/`**: Components specifically for handling 'items' (products, listings, etc.).
-            *   `ItemForm.js`: A large, multi-section form component responsible for both creating new items and editing existing ones. It manages complex nested state for item properties (name, type, description, location, parking, presentation, tags, status), integrates `MapPicker` for coordinate selection, uses `react-select` for tag management, performs client-side validation, and handles submission via `firestoreService` functions (`createItem`, `updateItem`).
+            *   `ItemForm.js`: A large, multi-section form component responsible for both creating new items and editing existing ones. Manages complex nested state including presentation details like custom logo uploads (`logoUrl`) and React Icon selection (`icon`). Integrates `MapPicker`, `ImageUploader`, `IconPickerModal`, and handles submission via `firestoreService`.
         *   **`map/`**: Components related to map features.
             *   `MapPicker.js`: Integrates Mapbox GL JS to provide an interactive map for coordinate selection. Allows users to set latitude/longitude by clicking the map, dragging a marker, using browser geolocation, or entering values manually into input fields. Handles initial coordinates, bounds checking (Maui), map initialization/cleanup, and calls back with the selected location.
-        *   `MapContainer.js`: The primary map component using Mapbox GL JS. Initializes the main map view centered on Maui, displays the user's current location with a marker and accuracy circle using geolocation, and shows map controls.
+            *   `MapContainer.js`: The primary map component using Mapbox GL JS. Initializes the map, displays items from Firestore as markers (using custom logo, React Icon, or fallback), handles user location, and opens `ItemDetailModal` on marker click.
     *   **`context/`**: Holds React Context API implementations for global state management.
         *   `AuthContext.js`: Provides authentication state (current user, loading status, error) and functions (login, loginWithGoogle, logout, resetPassword, updateProfile) to components throughout the app via the `useAuth` hook.
     *   **`pages/`**: Intended for top-level components representing distinct application pages or views. *Note: Current routing seems handled directly in `App.js` referencing components, making some page components potentially unused or placeholders.*

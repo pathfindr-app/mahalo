@@ -76,6 +76,9 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
   - Added basic styling and enabled vertical compaction for better usability.
   - Created `markdown/DESIGNING_MODALS.md` for detailed implementation plan and progress.
   - **Fixed Deal Display:** Resolved issues in `ItemDetailModal` preventing deal validity dates and claim counts from displaying correctly by handling Firestore Timestamps and using correct field names (`validity.startDate`, `validity.endDate`, `analytics.currentlyClaimed`, `limits.maxClaims`).
+- **Icon Functionality (Logo Upload & Display):**
+  - Added functionality to `ItemForm` to upload a custom vendor logo (`presentation.logoUrl`) via `ImageUploader` and Firebase Storage.
+  - Updated `MapContainer`, `ItemList`, and `ItemDetailModal` to display icons/logos based on priority: Custom Logo > React Icon > Category Icon (Fallback).
 
 ## Firebase Collections Structure
 
@@ -107,7 +110,8 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
     }
   },
   presentation: {
-    icon: string,            // Emoji or icon code
+    icon: string,            // React Icon name (e.g., 'FaBeer') or fallback category icon name
+    logoUrl: string | null,  // URL for uploaded custom logo (via Firebase Storage) - Takes precedence over icon
     container: {
       opacity: number,       // 0-100
       blur: number,         // 0-20
@@ -123,8 +127,8 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
         alt: string,
         order: number
       }
-    ],
-    modalLayout: Object | null // Added for designable modal layout
+    ]
+    // modalLayout: Object | null // DEPRECATED: Removed in favor of fixed MUI Grid layout in ItemDetailModal.js
   },
   tags: [String],          // Extensive predefined list for filtering/search (see utils/constants.js)
   status: {
@@ -175,6 +179,42 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 }
 ```
 
+### Future Schema Additions (Proposed)
+
+#### Reviews Collection (`Reviews`)
+*   **Purpose:** Store user-submitted reviews and ratings for items. Kept separate for scalability.
+*   **Structure:**
+```javascript
+{
+  reviewId: string,       // Auto-generated
+  itemId: string,         // Foreign key linking to the Item
+  userId: string,         // Foreign key linking to the User who wrote it
+  rating: number,         // e.g., 1-5
+  text: string,           // The review content
+  createdAt: timestamp,
+  status: string          // e.g., 'pending', 'approved', 'rejected' (for moderation)
+}
+```
+*   **Denormalization Potential:** A Cloud Function could update `averageRating` and `reviewCount` fields on the corresponding `Item` document whenever a review status changes to `approved` or is deleted, optimizing reads for lists/maps.
+
+#### Events Collection (`Events`)
+*   **Purpose:** Store event information associated with items (typically vendors/venues).
+*   **Structure:**
+```javascript
+{
+  eventId: string,        // Auto-generated
+  itemId: string,         // Foreign key linking to the Item (vendor/venue)
+  name: string,
+  description: string,
+  startTime: timestamp,
+  endTime: timestamp,
+  tags: [string],         // e.g., ['music', 'live', 'outdoor']
+  coverImage: string | null, // URL (optional)
+  status: string          // e.g., 'scheduled', 'cancelled'
+}
+```
+*   **Considerations:** Allows querying events by date range, location (via the linked item's location), or tags.
+
 ## Implementation Plan
 
 ### Phase 1: Basic Form & Listing Setup
@@ -221,12 +261,12 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
 
 ## Icon Implementation Plan
 
-**Goal:** Define a strategy for managing and displaying icons, prioritizing custom vendor logos and using **category-level icons** as a fallback to minimize visual clutter, especially on the map.
+**Goal:** Define a strategy for managing and displaying icons, prioritizing custom vendor logos (**`presentation.logoUrl`**), falling back to selected React Icons (**`presentation.icon`**), and finally using **category-level icons** if neither is specified.
 
 **Note:** This section outlines the *plan*. Asset creation and code changes will follow.
 
 **1. Category Icons (Fallback System):**
-   - **Purpose:** Provide consistent visual identifiers for the main item categories (e.g., Food & Drink, Land Activities) when a custom logo is not available.
+   - **Purpose:** Provide consistent visual identifiers for the main item categories (e.g., Food & Drink, Land Activities) *only* if no custom logo or specific React Icon is set for the item.
    - **Format:** SVG (Scalable Vector Graphics).
    - **Size:** Optimized for UI display (e.g., 24x24 or 32x32 pixels).
    - **Storage:** Store directly within the project's codebase in a dedicated directory (e.g., `src/assets/icons/categories/`).
@@ -234,7 +274,7 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
    - **Integration:**
      - Requires a mapping structure (likely in `src/utils/constants.js` or a dedicated file) to associate each detailed tag with its parent category (e.g., `'hiking'` maps to `'Land Activities'`).
      - Requires another structure to map category names to their respective icon file paths (e.g., `'Land Activities'` maps to `'src/assets/icons/categories/category-land-activities.svg'`).
-     - Components (like map markers, item lists) will use these mappings to determine the appropriate category icon based on an item's tags if no custom logo is present.
+     - Components (like map markers, item lists) will use these mappings to determine the appropriate category icon based on an item's tags *if both `presentation.logoUrl` and `presentation.icon` are missing*.
    - **Management:** Managed as part of the codebase; adding/changing category icons requires a code update and asset management.
 
 **2. Vendor/Custom Icons (Primary Display):**
@@ -242,26 +282,39 @@ Implementation of a comprehensive item (POI/Vendor) management system with an in
    - **Format:** Allow SVG or PNG (with transparency). Consider enforcing size limits or aspect ratios on upload if necessary.
    - **Storage:** Uploaded images will be stored in **Firebase Storage**.
    - **Integration:**
-     - **Upload:** The item/vendor form needs an image upload component specifically for this custom icon/logo.
-     - **Saving:** On successful upload to Firebase Storage, the public **download URL** will be saved in the item's Firestore document (e.g., in a `logoUrl` field).
-     - **Display Logic (Priority Order):**
-       1. If `logoUrl` exists, display the custom logo image (`<img src={logoUrl} />`).
-       2. If `logoUrl` does *not* exist, determine the item's primary category based on its `tags` array and the tag-to-category mapping.
-       3. Display the corresponding category icon (using the category-to-icon mapping).
-       4. If no tags exist or the category cannot be determined, display a generic default category icon (`category-default.svg`).
-   - **Management:** Managed dynamically through the application's form.
-   - **Dependencies:** Requires the image upload functionality (`ImageUploader`, `storageService`, Storage/CORS config) to be working.
+     - **Upload:** The item/vendor form needs an image upload component specifically for this custom icon/logo. This is *separate* from the React Icon picker.
+     - **Saving:** On successful upload to Firebase Storage, the public **download URL** will be saved in the item's Firestore document in the `presentation.logoUrl` field.
+     - **Management:** Managed dynamically through the application's form.
+     - **Dependencies:** Requires the image upload functionality (`ImageUploader`, `storageService`, Storage/CORS config) to be working.
+
+**3. React Icons (Secondary Display):**
+    - **Purpose:** Allow admins to select a specific icon from the `react-icons` library for an item when a custom logo isn't available or desired, overriding the category fallback.
+    - **Format:** String representing the icon name (e.g., 'FaBeer').
+    - **Storage:** Stored in the `presentation.icon` field in the item's Firestore document.
+    - **Integration:**
+        - **Selection:** Use the `IconPickerModal` component in the `ItemForm`.
+        - **Saving:** The selected icon name string is saved to `presentation.icon`.
+    - **Management:** Managed via the `ItemForm`.
+
+**Display Logic (Priority Order):**
+   1. If `presentation.logoUrl` exists, display the custom logo image (`<img src={logoUrl} />`).
+   2. Else if `presentation.icon` exists, display the specified React Icon component.
+   3. Else (neither logo nor specific icon exists), determine the item's primary category based on its `tags` array and the tag-to-category mapping.
+   4. Display the corresponding category icon (using the category-to-icon mapping).
+   5. If no tags exist or the category cannot be determined, display a generic default category icon (`category-default.svg`).
+
 
 **Tasks Derived from this Plan:**
    - [X] Define the mapping from detailed tags to main categories (e.g., `tagCategoryMap`). *(Assuming done based on category icon fallback logic)*
    - [X] Define the mapping from main category names to their icon file paths (e.g., `categoryIcons`). *(Assuming done based on category icon fallback logic)*
    - [ ] Source or create initial SVG icons for the 8 main categories plus a default icon. *(Still pending)*
    - [X] Create the `src/assets/icons/categories/` directory and add the category SVG files. *(Assuming done)*
-   - [X] Update relevant UI components (Map Markers, Item List, Item Detail Modal) to implement the display logic (Custom Logo -> Category Icon -> Default Icon). *(Map Markers updated to use React Icons; Item List/Detail Modal need verification)*
-   - [X] Add a file input field to the `ItemForm` specifically for vendor logo/custom icon upload (if not already present). *(Replaced with React Icon picker button/modal)*
-   - [X] Add a field (e.g., `logoUrl`) to the Firestore `Items` collection schema (if not already present). *(Using `presentation.icon` field for React Icon name)*
-   - [X] Implement the upload logic in `ItemForm` to use `storageService` for the logo (if not already present). *(N/A for React Icons)*
-   - [X] Implement logic in `ItemForm` to save the logo URL to Firestore upon submission (if not already present). *(Saving React Icon name to `presentation.icon`)*
+   - [X] **Update relevant UI components** (Map Markers, Item List, Item Detail Modal) to implement the **full display logic** (Custom Logo -> React Icon -> Category Icon -> Default Icon). *(Done)*
+   - [X] **Add a file input field** to the `ItemForm` specifically for vendor logo/custom icon upload (using `ImageUploader`). *(Done)*
+   - [X] **Add the `presentation.logoUrl` field** to the Firestore `Items` collection schema. *(Done via this edit)*
+   - [X] **Implement the upload logic** in `ItemForm` to use `storageService` for the logo and save the URL to `presentation.logoUrl` upon submission. *(Done)*
+   - [X] Implement logic in `ItemForm` to save the React Icon name to `presentation.icon`. *(Verified)*
+   - [X] Implement `IconPickerModal` for selecting React Icons in `ItemForm`. *(Verified)*
 
 ## Firebase Security Rules
 
@@ -305,6 +358,12 @@ service cloud.firestore {
 ```
 
 ## Next Steps
+
+**CURRENT FOCUS:** Decide next steps (e.g., Marker Clustering, Dynamic Markers, Autosave, Cloud Functions, Geospatial Queries).
+
+- **CURRENT FOCUS:** Complete the Icon Implementation tasks outlined above:
+  - Add Custom Logo upload functionality to `ItemForm`.
+  - Update UI components (`MapContainer`, `ItemDetailModal`, `ItemList`) to use the full icon display logic (Logo -> React Icon -> Category -> Default).
 
 1. [X] Set up development environment with Firebase *(Configuration confirmed and documented)*
 2. [X] Create basic Item Listing component *(Done)*
